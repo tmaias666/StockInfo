@@ -63,11 +63,11 @@ public class HttpUtils{
 
     private static final String finmind_stock_legalInfo_queryUrl = "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInstitutionalInvestorsBuySell&data_id=";
 
-    private static final String finmind_token_google = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyMS0wNy0xNCAxNTowNjo0MSIsInVzZXJfaWQiOiJ0bWFpYXM2NjYiLCJpcCI6IjEwMS45LjczLjE5NiJ9.Xi8EkhINXTIhWDpo1npejM5J4A6US08RXp1aMlGMW4w";
+    private static final String finmind_token_google = "finmind_token_google";
 
-    private static final String finmind_token_google2 = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyMS0wNy0xNSAxODowNDozNiIsInVzZXJfaWQiOiJ0b21teWxpbiIsImlwIjoiMTAxLjkuNDUuMTY1In0.v07-Ajm-Wxu3N3eDpCKcHRcPi8DaV5QaUOEbjZFk2ww";
+    private static final String finmind_token_google2 = "finmind_token_google2";
 
-    private static final String finmind_token_yahoo = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJkYXRlIjoiMjAyMS0wNy0xNCAxNzoyODoxMiIsInVzZXJfaWQiOiJ0bWFpYXM2NjY2IiwiaXAiOiIxMDEuOS42OC41In0.Wc46Sk-y5yO971ML4qUqEYuZAh3F5ImIXTRsvfp05No";
+    private static final String finmind_token_yahoo = "finmind_token_yahoo";
 
     public static String getStockLegalInfoByFinmind(String stockNo, String startDate, String endDate) throws ClientProtocolException, IOException, KeyManagementException, NoSuchAlgorithmException{
         String url = finmind_stock_legalInfo_queryUrl + stockNo + "&start_date=" + startDate + "&end_date=" + endDate + "&token=" + finmind_token_yahoo;

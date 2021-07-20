@@ -16,20 +16,25 @@ public class AwsController{
     @Autowired
     AwsService awsService;
 
-    @GetMapping("/uploadToS3")
+    @GetMapping("/testUploadToS3")
     public ResponseEntity<Object> uploadToS3(){
-        awsService.uploadToS3();
-        return ResponseEntity.status(HttpStatus.OK).body("uploadToS3 OK!");
+        try{
+            awsService.uploadToS3();
+            return ResponseEntity.status(HttpStatus.OK).body("upload to S3 OK!");
+        }catch(Exception e){
+            System.out.println(e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("upload to S3 error!");
+        }
     }
 
-    @GetMapping("/downloadFromS3")
+    @GetMapping("/testDownloadFromS3")
     public ResponseEntity<Object> downloadFromS3(){
         try{
             awsService.downloadFromS3();
-            return ResponseEntity.status(HttpStatus.OK).body("downloadFromS3 OK!");
+            return ResponseEntity.status(HttpStatus.OK).body("download from S3 OK!");
         }catch(Exception e){
             System.out.println(e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("downloadFromS3 error!");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("download from S3 error!");
         }
     }
 }
