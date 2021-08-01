@@ -1,5 +1,7 @@
 package com.ty.Util;
 
+import org.apache.commons.io.IOUtils;
+import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpEntityEnclosingRequest;
 import org.apache.http.HttpRequest;
@@ -8,6 +10,7 @@ import org.apache.http.client.HttpRequestRetryHandler;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.client.protocol.HttpClientContext;
 import org.apache.http.config.Registry;
@@ -23,26 +26,20 @@ import org.apache.http.protocol.HttpContext;
 import org.apache.http.util.EntityUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import com.ty.controller.StockInfoController;
-import com.ty.entity.AccountRecord;
-import com.ty.repository.AccountRecordRepository;
-import com.ty.repository.TseDailyAvgInfoRepository;
-import com.ty.repository.TseDailyBaseInfoRepository;
-import com.ty.repository.StockMainRepository;
-import com.ty.service.AccountService;
+import com.ty.vo.HttpResponseVo;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InterruptedIOException;
+import java.io.StringWriter;
 import java.net.UnknownHostException;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
-import java.util.List;
-
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManager;
@@ -68,6 +65,29 @@ public class HttpUtils{
     private static final String finmind_token_google2 = "finmind_token_google2";
 
     private static final String finmind_token_yahoo = "finmind_token_yahoo";
+
+    @Value("${line.bot.channelToken}")
+    String accessToken;
+
+    @Value("${line.getProfile.url}")
+    String getProfileUrl;
+
+    public String getLineUserInfo(String uid) throws ClientProtocolException, IOException, KeyManagementException, NoSuchAlgorithmException{
+        String url = getProfileUrl + uid;
+        logger.info("getLineUserInfo url: " + url);
+        CloseableHttpClient client = generateClient();
+        HttpUriRequest httpGet = new HttpGet(url);
+        httpGet.addHeader("Authorization", "Bearer " + accessToken);
+        CloseableHttpResponse response = client.execute(httpGet);
+        String entityStr = "";
+        if (response.getStatusLine().getStatusCode() == 200){
+            HttpEntity entity = response.getEntity();
+            if (entity != null){
+                entityStr = EntityUtils.toString(entity, "UTF-8");
+            }
+        }
+        return entityStr;
+    }
 
     public static String getStockLegalInfoByFinmind(String stockNo, String startDate, String endDate) throws ClientProtocolException, IOException, KeyManagementException, NoSuchAlgorithmException{
         String url = finmind_stock_legalInfo_queryUrl + stockNo + "&start_date=" + startDate + "&end_date=" + endDate + "&token=" + finmind_token_yahoo;
@@ -133,6 +153,49 @@ public class HttpUtils{
             }
         }
         return entityStr;
+    }
+
+    public static HttpResponseVo post(String url, Header[] headers, HttpEntity body){
+        Integer statusCode = 400;
+        try{
+            logger.error("HttpClientUtil post {} ", url);
+            HttpPost requestPost = new HttpPost(url);
+            requestPost.setHeaders(headers);
+            requestPost.setEntity(body);
+            return execute(requestPost);
+        }catch(Exception e){
+            logger.error("Execute Error", e);
+            return new HttpResponseVo(statusCode, e.getMessage());
+        }
+    }
+
+    public static HttpResponseVo execute(HttpUriRequest request){
+        CloseableHttpClient client = null;
+        CloseableHttpResponse rsp = null;
+        Integer statusCode = 400;
+        InputStream inputStream = null;
+        StringWriter writer = new StringWriter();
+        try{
+            client = generateClient();
+            rsp = client.execute(request);
+            statusCode = rsp.getStatusLine().getStatusCode();
+            HttpEntity rspEntity = rsp.getEntity();
+            inputStream = rspEntity.getContent();
+            IOUtils.copy(inputStream, writer, "utf-8");
+            EntityUtils.consume(rspEntity);
+        }catch(Exception e){
+            logger.error("Execute bcs Error", e);
+        }
+        String responseBody = writer.toString();
+        try{
+            if (writer != null) writer.close();
+            if (inputStream != null) inputStream.close();
+            if (rsp != null) rsp.close();
+            if (client != null) client.close();
+        }catch(Exception e){
+            logger.error("Execute bcs 111 Error", e);
+        }
+        return new HttpResponseVo(statusCode, responseBody);
     }
 
     private static CloseableHttpClient generateClient() throws NoSuchAlgorithmException, KeyManagementException{

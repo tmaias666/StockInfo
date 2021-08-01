@@ -19,8 +19,8 @@ public class AwsController{
     @GetMapping("/testUploadToS3")
     public ResponseEntity<Object> uploadToS3(){
         try{
-            awsService.uploadToS3();
-            return ResponseEntity.status(HttpStatus.OK).body("upload to S3 OK!");
+            //awsService.uploadToS3();
+            return ResponseEntity.status(HttpStatus.OK).body("upload to S3 successfully!");
         }catch(Exception e){
             System.out.println(e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("upload to S3 error!");
@@ -30,8 +30,8 @@ public class AwsController{
     @GetMapping("/testDownloadFromS3")
     public ResponseEntity<Object> downloadFromS3(){
         try{
-            awsService.downloadFromS3();
-            return ResponseEntity.status(HttpStatus.OK).body("download from S3 OK!");
+            awsService.downloadFromS3("test_file");
+            return ResponseEntity.status(HttpStatus.OK).body("download from S3 successfully!");
         }catch(Exception e){
             System.out.println(e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("download from S3 error!");

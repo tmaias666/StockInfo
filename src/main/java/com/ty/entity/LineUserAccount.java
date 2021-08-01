@@ -10,27 +10,23 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
 
-//@Data
 @SuppressWarnings("serial")
 @Entity
-@Table(name = "account_record")
-public class AccountRecord implements Serializable{
+@Table(name = "line_user_account")
+public class LineUserAccount implements Serializable{
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "uid", nullable = false)
-    private String uid;
+    @Column(name = "line_uid", nullable = false)
+    private String lineUid;
 
     @Column(name = "name", nullable = false)
     private String name;
 
-    @Column(name = "email", nullable = false)
-    private String email;
-
-    @Column(name = "create_date", nullable = false)
-    private Date createDate;
+    @Column(name = "create_time", nullable = false)
+    private Date createTime;
 
     public Long getId(){
         return id;
@@ -40,12 +36,12 @@ public class AccountRecord implements Serializable{
         this.id = id;
     }
 
-    public String getUid(){
-        return uid;
+    public String getLineUid(){
+        return lineUid;
     }
 
-    public void setUid(String uid){
-        this.uid = uid;
+    public void setLineUid(String lineUid){
+        this.lineUid = lineUid;
     }
 
     public String getName(){
@@ -56,19 +52,11 @@ public class AccountRecord implements Serializable{
         this.name = name;
     }
 
-    public String getEmail(){
-        return email;
+    public Date getCreateTime(){
+        return createTime;
     }
 
-    public void setEmail(String email){
-        this.email = email;
-    }
-
-    public Date getCreateDate(){
-        return createDate;
-    }
-
-    public void setCreateDate(Date createDate){
-        this.createDate = createDate;
+    public void setCreateTime(Date createTime){
+        this.createTime = createTime;
     }
 }

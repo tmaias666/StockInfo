@@ -5,6 +5,7 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration;
 import org.springframework.context.annotation.ComponentScan;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @ComponentScan(basePackages = {
     "com.ty.*"
@@ -13,6 +14,7 @@ import org.springframework.context.annotation.ComponentScan;
 @EnableAutoConfiguration(exclude = {
     MongoAutoConfiguration.class
 })
+@EnableScheduling
 public class TyApplication{
 
     public static void main(String[] args){
