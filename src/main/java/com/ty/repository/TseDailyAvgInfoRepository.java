@@ -19,7 +19,7 @@ public interface TseDailyAvgInfoRepository extends JpaRepository<TseDailyAvgInfo
     @Query(value = "select '上市' as '上市櫃', m.stock_name as '股名', tdli.stock_no as '股號', "
         +"tdli.foreign_investor as '外資買賣超', tdli.investment_trust as '投信買賣超', "
         +"tdli.dealer_self as '自營商買賣超', tdli.dealer_hedging as '自營商避險', "
-        +"t.end_price as '收盤價', t.diff_price as '今日漲跌點' "
+        +"t.end_price as '收盤價', t.diff_price as '漲跌點' "
         +"from (select tdai.stock_no, tdbi.end_price, tdbi.diff_price from stock.tse_daily_base_info tdbi "
         +"inner join stock.tse_daily_avg_info tdai "
         +"on tdbi.stock_no = tdai.stock_no and tdbi.info_date = tdai.info_date "
@@ -32,15 +32,57 @@ public interface TseDailyAvgInfoRepository extends JpaRepository<TseDailyAvgInfo
         +"inner join stock.stock_main m "
         +"on tdli.stock_no = t.stock_no and t.stock_no = m.stock_no "
         +"where tdli.info_date = :infoDate "
-        +"and (tdli.investment_trust > 0 and tdli.foreign_investor > 0) "
+        +"and (tdli.investment_trust > -1 and tdli.foreign_investor > -1) "
         +"order by (tdli.investment_trust + tdli.foreign_investor) desc ", nativeQuery = true)
     public List<Map<String, Object>> getTseBullStrategy1(@Param("infoDate") LocalDate infoDate);
 
-    //[空方策略1]上市收盤在月季線下+法人賣超排行
+    //[多方策略2]上市收盤在月季線上+外投買
     @Query(value = "select '上市' as '上市櫃', m.stock_name as '股名', tdli.stock_no as '股號', "
         +"tdli.foreign_investor as '外資買賣超', tdli.investment_trust as '投信買賣超', "
         +"tdli.dealer_self as '自營商買賣超', tdli.dealer_hedging as '自營商避險', "
-        +"t.end_price as '收盤價', t.diff_price as '今日漲跌點'  "
+        +"t.end_price as '收盤價', t.diff_price as '漲跌點'  "
+        +"from (select tdai.stock_no, tdbi.end_price, tdbi.diff_price from stock.tse_daily_base_info tdbi "
+        +"inner join stock.tse_daily_avg_info tdai "
+        +"on tdbi.stock_no = tdai.stock_no and tdbi.info_date = tdai.info_date "
+        +"where tdbi.info_date = :infoDate "
+        +"and (tdbi.end_price > tdai.month_avg_price "
+        +"and tdbi.end_price > tdai.season_avg_price)) t "
+        +"inner join stock.tse_daily_legal_info tdli "
+        +"inner join stock.stock_main m "
+        +"on tdli.stock_no = t.stock_no and t.stock_no = m.stock_no "
+        +"where tdli.info_date = :infoDate "
+        +"and (tdli.investment_trust > 0 and tdli.foreign_investor > 0)"
+        +"order by (tdli.investment_trust + tdli.foreign_investor) desc ", nativeQuery = true)
+    public List<Map<String, Object>> getTseBullStrategy2(@Param("infoDate") LocalDate infoDate);
+    
+    
+    
+    //[空方策略1]5,10,20ma下彎且外投賣
+    @Query(value = "select '上市' as '上市櫃', m.stock_name as '股名', "
+        +"tdli.foreign_investor as '外資買賣超', "
+        +"tdli.investment_trust as '投信買賣超', "
+        +"tdli.dealer_self as '自營商買賣超', "
+        +"tdli.dealer_hedging as '自營商避險', "
+        +"t.end_price as '收盤價', t.diff_price as '漲跌點' "
+        +"from (select tdai.stock_no, tdbi.end_price, tdbi.diff_price from stock.tse_daily_base_info tdbi "
+        +"inner join stock.tse_daily_avg_info tdai "
+        +"on tdbi.stock_no = tdai.stock_no and tdbi.info_date = tdai.info_date "
+        +"where tdbi.info_date = :infoDate "
+        +"and tdai.five_avg_direction = 2 and tdai.ten_avg_direction = 2 "
+        +"and tdai.month_avg_direction = 2) t "
+        +"inner join stock.tse_daily_legal_info tdli "
+        +"inner join stock.stock_main m "
+        +"on tdli.stock_no = t.stock_no and t.stock_no = m.stock_no "
+        +"where tdli.info_date = :infoDate "
+        +"and (tdli.investment_trust < 0  and tdli.foreign_investor < 0) "
+        +"order by (tdli.investment_trust + tdli.foreign_investor) ", nativeQuery = true)
+    public List<Map<String, Object>> getTseBearStrategy1(@Param("infoDate") LocalDate infoDate);
+    
+    //[空方策略2]上市收盤在月季線下+外投賣
+    @Query(value = "select '上市' as '上市櫃', m.stock_name as '股名', tdli.stock_no as '股號', "
+        +"tdli.foreign_investor as '外資買賣超', tdli.investment_trust as '投信買賣超', "
+        +"tdli.dealer_self as '自營商買賣超', tdli.dealer_hedging as '自營商避險', "
+        +"t.end_price as '收盤價', t.diff_price as '漲跌點'  "
         +"from (select tdai.stock_no, tdbi.end_price, tdbi.diff_price from stock.tse_daily_base_info tdbi "
         +"inner join stock.tse_daily_avg_info tdai "
         +"on tdbi.stock_no = tdai.stock_no and tdbi.info_date = tdai.info_date "
@@ -53,5 +95,5 @@ public interface TseDailyAvgInfoRepository extends JpaRepository<TseDailyAvgInfo
         +"where tdli.info_date = :infoDate "
         +"and (tdli.investment_trust < 0 and tdli.foreign_investor < 0)"
         +"order by (tdli.investment_trust + tdli.foreign_investor) asc ", nativeQuery = true)
-    public List<Map<String, Object>> getTseBearStrategy1(@Param("infoDate") LocalDate infoDate);
+    public List<Map<String, Object>> getTseBearStrategy2(@Param("infoDate") LocalDate infoDate);
 }

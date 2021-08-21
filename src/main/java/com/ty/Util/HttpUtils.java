@@ -60,12 +60,6 @@ public class HttpUtils{
 
     private static final String finmind_stock_legalInfo_queryUrl = "https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockInstitutionalInvestorsBuySell&data_id=";
 
-    private static final String finmind_token_google = "finmind_token_google";
-
-    private static final String finmind_token_google2 = "finmind_token_google2";
-
-    private static final String finmind_token_yahoo = "finmind_token_yahoo";
-
     @Value("${line.bot.channelToken}")
     String accessToken;
 
@@ -89,8 +83,8 @@ public class HttpUtils{
         return entityStr;
     }
 
-    public static String getStockLegalInfoByFinmind(String stockNo, String startDate, String endDate) throws ClientProtocolException, IOException, KeyManagementException, NoSuchAlgorithmException{
-        String url = finmind_stock_legalInfo_queryUrl + stockNo + "&start_date=" + startDate + "&end_date=" + endDate + "&token=" + finmind_token_yahoo;
+    public static String getStockLegalInfoByFinmind(String stockNo, String startDate, String endDate, String accessToken) throws ClientProtocolException, IOException, KeyManagementException, NoSuchAlgorithmException{
+        String url = finmind_stock_legalInfo_queryUrl + stockNo + "&start_date=" + startDate + "&end_date=" + endDate + "&token=" + accessToken;
         logger.info("finmind stock legal request url: " + url);
         CloseableHttpClient client = generateClient();
         HttpUriRequest httpGet = new HttpGet(url);
@@ -105,8 +99,8 @@ public class HttpUtils{
         return entityStr;
     }
 
-    public static String getStockPriceInfoByFinmind(String stockNo, String startDate, String endDate) throws ClientProtocolException, IOException, KeyManagementException, NoSuchAlgorithmException{
-        String url = finmind_stock_priceInfo_queryUrl + stockNo + "&start_date=" + startDate + "&end_date=" + endDate + "&token=" + finmind_token_yahoo;
+    public static String getStockPriceInfoByFinmind(String stockNo, String startDate, String endDate, String accessToken) throws ClientProtocolException, IOException, KeyManagementException, NoSuchAlgorithmException{
+        String url = finmind_stock_priceInfo_queryUrl + stockNo + "&start_date=" + startDate + "&end_date=" + endDate + "&token=" + accessToken;
         logger.info("finmind stock price request url: " + url);
         CloseableHttpClient client = generateClient();
         HttpUriRequest httpGet = new HttpGet(url);

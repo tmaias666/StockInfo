@@ -49,6 +49,8 @@ public class StockService{
 
     private static final Logger logger = LoggerFactory.getLogger(StockService.class);
 
+    private static final Gson gson = new Gson();
+
     @Autowired
     private StockMainRepository stockMainRepository;
 
@@ -69,90 +71,156 @@ public class StockService{
 
     @Autowired
     private OtcDailyLegalInfoRepository otcDailyLegalInfoRepository;
-
-    private static final Gson gson = new Gson();
+    //second
+    //@Autowired
+    //OtcDailyBaseInfoSecondRepository otcDailyBaseInfoSecondRepository;
+    //
+    //@Autowired
+    //OtcDailyLegalInfoSecondRepository otcDailyLegalInfoSecondRepository;
+    //
+    //@Autowired
+    //TseDailyBaseInfoSecondRepository tseDailyBaseInfoSecondRepository;
+    //
+    //@Autowired
+    //TseDailyLegalInfoSecondRepository tseDailyLegalInfoSecondRepository;
 
     @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
-    public void syncStockPriceAvgInfo(String stockNo, int stockType) throws Exception{
-        List<Map<String, Object>> dailyEndPriceList;
+    public void executeMigration() throws Exception{
+        //        List<TseDailyBaseInfo> tdbiList = tseDailyBaseInfoRepository.findAll();
+        //        List<TseDailyBaseInfoSecond> tdbisList = new ArrayList<TseDailyBaseInfoSecond>();
+        //        for(TseDailyBaseInfo tdbi : tdbiList){
+        //            TseDailyBaseInfoSecond tdbis = new TseDailyBaseInfoSecond();
+        //            BeanUtils.copyProperties(tdbis, tdbi);
+        //            tdbis.setId(null);
+        //            tdbisList.add(tdbis);
+        //        }
+        //        tseDailyBaseInfoSecondRepository.saveAll(tdbisList);
+        //        List<TseDailyLegalInfo> tdliList = tseDailyLegalInfoRepository.findAll();
+        //        List<TseDailyLegalInfoSecond> tdlisList = new ArrayList<TseDailyLegalInfoSecond>();
+        //        for(TseDailyLegalInfo tdli : tdliList){
+        //            TseDailyLegalInfoSecond tdlis = new TseDailyLegalInfoSecond();
+        //            BeanUtils.copyProperties(tdlis, tdli);
+        //            tdlis.setId(null);
+        //            tdlisList.add(tdlis);
+        //        }
+        //        tseDailyLegalInfoSecondRepository.saveAll(tdlisList);
+        //        List<OtcDailyLegalInfo> odliList = otcDailyLegalInfoRepository.findAll();
+        //        List<OtcDailyLegalInfoSecond> odlisList = new ArrayList<OtcDailyLegalInfoSecond>();
+        //        for(OtcDailyLegalInfo odli : odliList){
+        //            OtcDailyLegalInfoSecond odlis = new OtcDailyLegalInfoSecond();
+        //            BeanUtils.copyProperties(odlis, odli);
+        //            odlis.setId(null);
+        //            odlisList.add(odlis);
+        //        }
+        //        otcDailyLegalInfoSecondRepository.saveAll(odlisList);
+        //        List<OtcDailyBaseInfo> odbiList = otcDailyBaseInfoRepository.findAll();
+        //        List<OtcDailyBaseInfoSecond> odbisList = new ArrayList<OtcDailyBaseInfoSecond>();
+        //        for(OtcDailyBaseInfo odbi : odbiList){
+        //            OtcDailyBaseInfoSecond odbis = new OtcDailyBaseInfoSecond();
+        //            BeanUtils.copyProperties(odbis, odbi);
+        //            odbis.setId(null);
+        //            odbisList.add(odbis);
+        //        }
+        //        otcDailyBaseInfoSecondRepository.saveAll(odbisList);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
+    public void syncStockPriceAvgInfo(String[] stockSeries, int stockType) throws Exception{
+        List saveList = new ArrayList<>();
         if (stockType == 1){
-            dailyEndPriceList = tseDailyBaseInfoRepository.getEndPriceInfoForDailySync(stockNo);
+            saveList = new ArrayList<TseDailyAvgInfo>();
         }else if (stockType == 2){
-            dailyEndPriceList = otcDailyBaseInfoRepository.getEndPriceInfoForDailySync(stockNo);
-        }else{
-            throw new Exception("invalid stockType!");
+            saveList = new ArrayList<OtcDailyAvgInfo>();
         }
-        Date now = new Date();
-        Deque<Double> tempQueue = new ArrayDeque<Double>();
-        double todayEndPrice = Double.valueOf(dailyEndPriceList.get(0).get("endPrice").toString());
-        StockDailyAvgInfo sdai = new StockDailyAvgInfo();
-        sdai.setStockNo(stockNo);
-        sdai.setCreateTime(now);
-        sdai.setUpdateTime(now);
-        sdai.setInfoDate(LocalDate.now());
-        //歷史資料不夠set default
-        sdai.setSeasonAvgPrice((double) 0);
-        sdai.setSeasonAvgDirection(0);
-        sdai.setHalfYearAvgPrice((double) 0);
-        sdai.setHalfYearAvgDirection(0);
-        sdai.setYearAvgPrice((double) 0);
-        sdai.setYearAvgDirection(0);
-        for(int i = 0; i < dailyEndPriceList.size(); i++){
-            Map<String, Object> tempMap = dailyEndPriceList.get(i);
-            tempQueue.add(Double.valueOf(tempMap.get("endPrice").toString()));
-            switch(i){
-                case 4://算5日均
-                    sdai.setFiveAvgPrice(countAvgPriceInfo(tempQueue));
-                    break;
-                case 5://比5日上揚或下彎
-                    sdai.setFiveAvgDirection(getAvgDirection(todayEndPrice, tempQueue.peekLast()));
-                    break;
-                case 9://算10日均
-                    sdai.setTenAvgPrice(countAvgPriceInfo(tempQueue));
-                    break;
-                case 10://比10日上揚或下彎
-                    sdai.setTenAvgDirection(getAvgDirection(todayEndPrice, tempQueue.peekLast()));
-                    break;
-                case 19://算20日均+布林上下軌
-                    sdai.setMonthAvgPrice(countAvgPriceInfo(tempQueue));
-                    double sd = getStandardDeviaction(tempQueue) * 2;
-                    sdai.setBollingerTop(new BigDecimal(sdai.getMonthAvgPrice() + sd).setScale(2, RoundingMode.HALF_UP).doubleValue());
-                    sdai.setBollingerBottom(new BigDecimal(sdai.getMonthAvgPrice() - sd).setScale(2, RoundingMode.HALF_UP).doubleValue());
-                    break;
-                case 20://比20日上揚或下彎
-                    sdai.setMonthAvgDirection(getAvgDirection(todayEndPrice, tempQueue.peekLast()));
-                    break;
-                case 59://算60日均
-                    sdai.setSeasonAvgPrice(countAvgPriceInfo(tempQueue));
-                    break;
-                case 60://比60日上揚或下彎
-                    sdai.setSeasonAvgDirection(getAvgDirection(todayEndPrice, tempQueue.peekLast()));
-                    break;
-                case 119://算120日均
-                    sdai.setHalfYearAvgPrice(countAvgPriceInfo(tempQueue));
-                    break;
-                case 120://比120日上揚或下彎
-                    sdai.setHalfYearAvgDirection(getAvgDirection(todayEndPrice, tempQueue.peekLast()));
-                    break;
-                case 239://算240日均
-                    sdai.setYearAvgPrice(countAvgPriceInfo(tempQueue));
-                    break;
-                case 240://比240日上揚或下彎
-                    sdai.setYearAvgDirection(getAvgDirection(todayEndPrice, tempQueue.peekLast()));
-                    break;
-                default:
-                    break;
+        for(int i = 0; i < stockSeries.length; i++){
+            String[] info = stockSeries[i].split(";");
+            String stockNo = info[0];
+            List<Map<String, Object>> dailyEndPriceList;
+            if (stockType == 1){
+                dailyEndPriceList = tseDailyBaseInfoRepository.getEndPriceInfoForDailySync(stockNo);
+            }else if (stockType == 2){
+                dailyEndPriceList = otcDailyBaseInfoRepository.getEndPriceInfoForDailySync(stockNo);
+            }else{
+                throw new Exception("invalid stockType!");
             }
-        }
-        logger.info(gson.toJson(sdai));
-        if (stockType == 1){
-            TseDailyAvgInfo tdai = new TseDailyAvgInfo();
-            BeanUtils.copyProperties(tdai, sdai);
-            tseDailyAvgInfoRepository.save(tdai);
-        }else if (stockType == 2){
-            OtcDailyAvgInfo odai = new OtcDailyAvgInfo();
-            BeanUtils.copyProperties(odai, sdai);
-            otcDailyAvgInfoRepository.save(odai);
+            Date now = new Date();
+            Deque<Double> tempQueue = new ArrayDeque<Double>();
+            double todayEndPrice = Double.valueOf(dailyEndPriceList.get(0).get("endPrice").toString());
+            StockDailyAvgInfo sdai = new StockDailyAvgInfo();
+            sdai.setStockNo(stockNo);
+            sdai.setCreateTime(now);
+            sdai.setUpdateTime(now);
+            sdai.setInfoDate(LocalDate.now());
+            //歷史資料不夠set default
+            sdai.setSeasonAvgPrice((double) 0);
+            sdai.setSeasonAvgDirection(0);
+            sdai.setHalfYearAvgPrice((double) 0);
+            sdai.setHalfYearAvgDirection(0);
+            sdai.setYearAvgPrice((double) 0);
+            sdai.setYearAvgDirection(0);
+            for(int j = 0; j < dailyEndPriceList.size(); j++){
+                Map<String, Object> tempMap = dailyEndPriceList.get(j);
+                tempQueue.add(Double.valueOf(tempMap.get("endPrice").toString()));
+                switch(j){
+                    case 4://算5日均
+                        sdai.setFiveAvgPrice(countAvgPriceInfo(tempQueue));
+                        break;
+                    case 5://比5日上揚或下彎
+                        sdai.setFiveAvgDirection(getAvgDirection(todayEndPrice, tempQueue.peekLast()));
+                        break;
+                    case 9://算10日均
+                        sdai.setTenAvgPrice(countAvgPriceInfo(tempQueue));
+                        break;
+                    case 10://比10日上揚或下彎
+                        sdai.setTenAvgDirection(getAvgDirection(todayEndPrice, tempQueue.peekLast()));
+                        break;
+                    case 19://算20日均+布林上下軌
+                        sdai.setMonthAvgPrice(countAvgPriceInfo(tempQueue));
+                        double sd = getStandardDeviaction(tempQueue) * 2;
+                        sdai.setBollingerTop(new BigDecimal(sdai.getMonthAvgPrice() + sd).setScale(2, RoundingMode.HALF_UP).doubleValue());
+                        sdai.setBollingerBottom(new BigDecimal(sdai.getMonthAvgPrice() - sd).setScale(2, RoundingMode.HALF_UP).doubleValue());
+                        break;
+                    case 20://比20日上揚或下彎
+                        sdai.setMonthAvgDirection(getAvgDirection(todayEndPrice, tempQueue.peekLast()));
+                        break;
+                    case 59://算60日均
+                        sdai.setSeasonAvgPrice(countAvgPriceInfo(tempQueue));
+                        break;
+                    case 60://比60日上揚或下彎
+                        sdai.setSeasonAvgDirection(getAvgDirection(todayEndPrice, tempQueue.peekLast()));
+                        break;
+                    case 119://算120日均
+                        sdai.setHalfYearAvgPrice(countAvgPriceInfo(tempQueue));
+                        break;
+                    case 120://比120日上揚或下彎
+                        sdai.setHalfYearAvgDirection(getAvgDirection(todayEndPrice, tempQueue.peekLast()));
+                        break;
+                    case 239://算240日均
+                        sdai.setYearAvgPrice(countAvgPriceInfo(tempQueue));
+                        break;
+                    case 240://比240日上揚或下彎
+                        sdai.setYearAvgDirection(getAvgDirection(todayEndPrice, tempQueue.peekLast()));
+                        break;
+                    default:
+                        break;
+                }
+            }
+            logger.info(gson.toJson(sdai));
+            if (stockType == 1){
+                TseDailyAvgInfo tdai = new TseDailyAvgInfo();
+                BeanUtils.copyProperties(tdai, sdai);
+                saveList.add(tdai);
+                if (i == stockSeries.length - 1){
+                    tseDailyAvgInfoRepository.saveAll(saveList);
+                }
+            }else if (stockType == 2){
+                OtcDailyAvgInfo odai = new OtcDailyAvgInfo();
+                BeanUtils.copyProperties(odai, sdai);
+                saveList.add(odai);
+                if (i == stockSeries.length - 1){
+                    otcDailyAvgInfoRepository.saveAll(saveList);
+                }
+            }
         }
     }
 
@@ -430,11 +498,11 @@ public class StockService{
     }
 
     @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
-    public void fetchDailyStockLegalInfo(String stockNo, int stockType, String[] dateRange) throws Exception{
+    public void fetchDailyStockLegalInfo(String stockNo, int stockType, String[] dateRange, String accessToken) throws Exception{
         //撈上市櫃股
         //List<String> stockNoList = stockMainRepository.getStockNoByStockType(stockType);
         Date now = new Date();
-        String result = HttpUtils.getStockLegalInfoByFinmind(stockNo, dateRange[0], dateRange[1]);
+        String result = HttpUtils.getStockLegalInfoByFinmind(stockNo, dateRange[0], dateRange[1], accessToken);
         logger.info("query result: " + result);
         JSONObject obj = new JSONObject(result);
         JSONArray arr = obj.getJSONArray("data");//每天的個股法人買賣資訊
@@ -535,12 +603,12 @@ public class StockService{
     }
 
     @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
-    public void processAllTypeStockByFinmind(String stockNo, String stockName, int stockType, String[] dateRange) throws Exception{
+    public void processAllTypeStockByFinmind(String stockNo, String stockName, int stockType, String[] dateRange, String accessToken) throws Exception{
         logger.info("query stockNo: " + stockNo + "; stock name: " + stockName);
         //第一次同步個股需要先做一次
         //saveStockMain(stockNo, stockName, stockType);
         Date now = new Date();
-        String result = HttpUtils.getStockPriceInfoByFinmind(stockNo, dateRange[0], dateRange[1]);
+        String result = HttpUtils.getStockPriceInfoByFinmind(stockNo, dateRange[0], dateRange[1], accessToken);
         logger.info("query result: " + result);
         JSONObject obj = new JSONObject(result);
         JSONArray arr = obj.getJSONArray("data");//每天的個股資訊陣列 

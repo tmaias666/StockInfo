@@ -11,6 +11,8 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
 
+import org.hibernate.annotations.GenericGenerator;
+
 import com.ty.vo.StockLegalInfo;
 
 @SuppressWarnings("serial")
@@ -19,7 +21,9 @@ import com.ty.vo.StockLegalInfo;
 public class TseDailyLegalInfo extends StockLegalInfo implements Serializable{
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    //@GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(generator = "generator")
+    @GenericGenerator(name = "generator", strategy = "increment")
     private Long id;
 
     @Column(name = "stock_no", nullable = false)

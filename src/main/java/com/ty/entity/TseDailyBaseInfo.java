@@ -12,13 +12,17 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
 
+import org.hibernate.annotations.GenericGenerator;
+
 @SuppressWarnings("serial")
 @Entity
 @Table(name = "tse_daily_base_info")
 public class TseDailyBaseInfo implements Serializable{
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    //@GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(generator = "generator")
+    @GenericGenerator(name = "generator", strategy = "increment")
     private Long id;
 
     @Column(name = "stock_no", nullable = false) //標的代號

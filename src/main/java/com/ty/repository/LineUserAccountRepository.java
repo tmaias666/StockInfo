@@ -14,4 +14,6 @@ import org.springframework.data.repository.query.Param;
 public interface LineUserAccountRepository extends JpaRepository<LineUserAccount, Long>{
 
     public LineUserAccount findByLineUid(String uid);
+
+    public List<LineUserAccount> findByIsVerified(Integer isVerified);
 }

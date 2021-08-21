@@ -35,9 +35,28 @@ public interface OtcDailyBaseInfoRepository extends JpaRepository<OtcDailyBaseIn
         +"sum(t.investment_trust) as 'it', sum(t.dealer_self) as 'ds', "
         +"sum(t.dealer_hedging) as 'dh' from "
         +"(select m.stock_name, odli.info_date, odli.foreign_investor, odli.investment_trust, odli.dealer_self, odli.dealer_hedging "
-        +"from stock.otc_daily_legal_info odli "
-        +"inner join stock.stock_main m on odli.stock_no = m.stock_no "
-        +"where odli.info_date > :startDate and odli.info_date < :endDate) t "
-        +"group by t.stock_name order by (sum(t.foreign_investor) + sum(t.investment_trust)) desc ", nativeQuery = true)
-    public List<Map<String, Object>> getWeeklyFiAndItStrategy(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+        +"from stock.otc_daily_base_info odbi, stock.otc_daily_legal_info odli, "
+        +"stock.stock_main m where odli.stock_no = m.stock_no "
+        +"and odli.stock_no = odbi.stock_no and odli.info_date = odbi.info_date "
+        +"and odli.info_date > :startDate and odli.info_date < :endDate) t "
+        +"group by t.stock_name order by (sum(t.foreign_investor) + sum(t.investment_trust)) desc", nativeQuery = true)
+    public List<Map<String, Object>> getFiAndItBuySellStrategy(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+    
+    
+    //取個股近幾日的總交易量
+    @Query(value = "select t.stock_no, sum(t.total_volumn) as 'sumVolumn' from "
+        +"(select odbi.stock_no, odbi.info_date, odbi.total_volumn from stock.otc_daily_base_info odbi "
+        +"where odbi.stock_no in :stockNoList order by odbi.info_date desc limit :limit) t "
+        +"group by t.stock_no ", nativeQuery = true)
+    public List<Map<String, Object>> getRecentTotalVolumn(@Param("stockNoList") List<String> stockNoList, @Param("limit") Integer limit);
+    
+    //客製策略一
+    @Query(value = "select odbi.stock_no, sm.stock_name, odbi.diff_price, "
+        +"odbi.start_price, odbi.end_price, odbi.high_price, odbi.low_price, odai.five_avg_price "
+        +"from stock.stock_main sm "
+        +"inner join stock.otc_daily_base_info odbi on sm.stock_no = odbi.stock_no "
+        +"inner join stock.otc_daily_avg_info odai on sm.stock_no = odai.stock_no "
+        +"where odbi.info_date = :infoDate and odai.info_date = :infoDate "
+        +"and odbi.k_status = 1 and odbi.low_price >= odai.five_avg_price ", nativeQuery = true)
+    public List<Map<String, Object>> getCustomStrategy1(@Param("infoDate") LocalDate infoDate);
 }

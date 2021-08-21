@@ -3,8 +3,11 @@ package com.ty.controller;
 import java.io.IOException;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
+import java.time.LocalDate;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
+
+import javax.servlet.http.HttpServletRequest;
 
 import org.apache.http.client.ClientProtocolException;
 import org.slf4j.Logger;
@@ -46,7 +49,10 @@ public class StockInfoController{
     private StockService stockService;
 
     @Autowired
-    private StockConfig stockConfig;
+    String[] tseDataSeries;
+
+    @Autowired
+    String[] otcDataSeries;
 
     @GetMapping("/syncStockPriceAvgInfo")
     public ResponseEntity<Object> syncStockPriceAvgInfo() throws KeyManagementException, ClientProtocolException, NoSuchAlgorithmException, IOException{
@@ -78,16 +84,10 @@ public class StockInfoController{
         public T call() throws Exception{
             switch(stockType){
                 case 1:
-                    for(String stockInfo : stockConfig.tseDataSeries()){
-                        String[] info = stockInfo.split(";");
-                        stockService.syncStockPriceAvgInfo(info[0], stockType);
-                    }
+                    stockService.syncStockPriceAvgInfo(tseDataSeries, stockType);
                     break;
                 case 2:
-                    for(String stockInfo : stockConfig.otcDataSeries()){
-                        String[] info = stockInfo.split(";");
-                        stockService.syncStockPriceAvgInfo(info[0], stockType);
-                    }
+                    stockService.syncStockPriceAvgInfo(otcDataSeries, stockType);
                     break;
                 default:
                     throw new Exception("invalid stock type!");
@@ -97,22 +97,24 @@ public class StockInfoController{
     }
 
     @GetMapping("/fetchStockLegalInfo")
-    public ResponseEntity<Object> fetchStockLegalInfo(@RequestParam("stockType") int stockType) throws KeyManagementException, ClientProtocolException, NoSuchAlgorithmException, IOException{
+    public ResponseEntity<Object> fetchStockLegalInfo(HttpServletRequest request, @RequestParam("stockType") int stockType) throws KeyManagementException, ClientProtocolException, NoSuchAlgorithmException, IOException{
         try{
+            String accessToken = request.getSession().getAttribute("accessToken").toString();
+            String todayDate = LocalDate.now().toString();
             String[] dateRange = new String[]{
-                DateUtils.todayDate, DateUtils.todayDate
+                todayDate, todayDate
             };
             switch(stockType){
                 case 1:
-                    for(String stockInfo : stockConfig.tseDataSeries()){
+                    for(String stockInfo : tseDataSeries){
                         String[] info = stockInfo.split(";");
-                        stockService.fetchDailyStockLegalInfo(info[0], stockType, dateRange);
+                        stockService.fetchDailyStockLegalInfo(info[0], stockType, dateRange, accessToken);
                     }
                     break;
                 case 2:
-                    for(String stockInfo : stockConfig.otcDataSeries()){
+                    for(String stockInfo : otcDataSeries){
                         String[] info = stockInfo.split(";");
-                        stockService.fetchDailyStockLegalInfo(info[0], stockType, dateRange);
+                        stockService.fetchDailyStockLegalInfo(info[0], stockType, dateRange, accessToken);
                     }
                     break;
                 default:
@@ -126,22 +128,24 @@ public class StockInfoController{
     }
 
     @GetMapping("/fetchStockPriceInfo")
-    public ResponseEntity<Object> fetchStockPriceInfo(@RequestParam("stockType") int stockType) throws KeyManagementException, ClientProtocolException, NoSuchAlgorithmException, IOException{
+    public ResponseEntity<Object> fetchStockPriceInfo(HttpServletRequest request, @RequestParam("stockType") int stockType) throws KeyManagementException, ClientProtocolException, NoSuchAlgorithmException, IOException{
         try{
+            String accessToken = request.getSession().getAttribute("accessToken").toString();
+            String todayDate = LocalDate.now().toString();
             String[] dateRange = new String[]{
-                DateUtils.todayDate, DateUtils.todayDate
+                todayDate, todayDate
             };
             switch(stockType){
                 case 1:
-                    for(String stockInfo : stockConfig.tseDataSeries()){
+                    for(String stockInfo : tseDataSeries){
                         String[] info = stockInfo.split(";");
-                        stockService.processAllTypeStockByFinmind(info[0], info[1], 1, dateRange);
+                        stockService.processAllTypeStockByFinmind(info[0], info[1], 1, dateRange, accessToken);
                     }
                     break;
                 case 2:
-                    for(String stockInfo : stockConfig.otcDataSeries()){
+                    for(String stockInfo : otcDataSeries){
                         String[] info = stockInfo.split(";");
-                        stockService.processAllTypeStockByFinmind(info[0], info[1], 2, dateRange);
+                        stockService.processAllTypeStockByFinmind(info[0], info[1], 2, dateRange, accessToken);
                     }
                     break;
                 default:
@@ -159,13 +163,13 @@ public class StockInfoController{
         try{
             switch(stockType){
                 case 1:
-                    for(String stockInfo : stockConfig.tseDataSeries()){
+                    for(String stockInfo : tseDataSeries){
                         String[] info = stockInfo.split(";");
                         stockService.rebuildStockPriceAvgInfo(info[0], stockType);
                     }
                     break;
                 case 2:
-                    for(String stockInfo : stockConfig.otcDataSeries()){
+                    for(String stockInfo : otcDataSeries){
                         String[] info = stockInfo.split(";");
                         stockService.rebuildStockPriceAvgInfo(info[0], stockType);
                     }
@@ -178,5 +182,16 @@ public class StockInfoController{
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
         }
         return ResponseEntity.status(HttpStatus.OK).body("fetch successfully!");
+    }
+
+    @GetMapping("/executeDataMigration")
+    public ResponseEntity<Object> executeDataMigration(){
+        try{
+            stockService.executeMigration();
+            return ResponseEntity.status(HttpStatus.OK).body("fetch successfully!");
+        }catch(Exception e){
+            logger.error("error: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+        }
     }
 }

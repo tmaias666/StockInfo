@@ -28,6 +28,9 @@ public class LineUserAccount implements Serializable{
     @Column(name = "create_time", nullable = false)
     private Date createTime;
 
+    @Column(name = "is_verified", nullable = false)
+    private Integer isVerified;
+
     public Long getId(){
         return id;
     }
@@ -58,5 +61,13 @@ public class LineUserAccount implements Serializable{
 
     public void setCreateTime(Date createTime){
         this.createTime = createTime;
+    }
+
+    public Integer getIsVerified(){
+        return isVerified;
+    }
+
+    public void setIsVerified(Integer isVerified){
+        this.isVerified = isVerified;
     }
 }

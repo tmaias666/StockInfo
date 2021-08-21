@@ -13,6 +13,7 @@ import com.ty.Util.DateUtils;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -61,7 +62,7 @@ public class ReportService{
         return path;
     }
 
-    public String generateStrategyReport(String strategyName, List<Map<String, Object>> dataList) throws IOException{
+    public String generateStrategyReport(String strategyName, List<Map<String, Object>> dataList, LocalDate date) throws IOException{
         XSSFWorkbook workbook = new XSSFWorkbook();
         // 表頭樣式
         CellStyle cellStyle = workbook.createCellStyle();
@@ -88,7 +89,7 @@ public class ReportService{
         titleRow.createCell(5).setCellValue("自營商買賣超");
         titleRow.createCell(6).setCellValue("自營商避險");
         titleRow.createCell(7).setCellValue("收盤價");
-        titleRow.createCell(8).setCellValue("今日漲跌點");
+        titleRow.createCell(8).setCellValue("漲跌點");
         int rowNum = 1;
         for(Map<String, Object> data : dataList){
             Row row = sheet.createRow(rowNum);
@@ -101,10 +102,10 @@ public class ReportService{
             row.createCell(5, CellType.NUMERIC).setCellValue((int) data.get("自營商買賣超"));
             row.createCell(6, CellType.NUMERIC).setCellValue((int) data.get("自營商避險"));
             row.createCell(7, CellType.NUMERIC).setCellValue(Double.valueOf(data.get("收盤價").toString()));
-            row.createCell(8, CellType.NUMERIC).setCellValue(Double.valueOf(data.get("今日漲跌點").toString()));
+            row.createCell(8, CellType.NUMERIC).setCellValue(Double.valueOf(data.get("漲跌點").toString()));
             rowNum++;
         }
-        String path = "D:\\DailyStockReport\\" + strategyName + "_" + DateUtils.todayDate + ".xlsx";
+        String path = "D:\\DailyStockReport\\" + strategyName + "_" + date.toString() + ".xlsx";
         FileOutputStream out = new FileOutputStream(path);
         workbook.write(out);
         out.close();

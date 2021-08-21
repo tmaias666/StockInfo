@@ -35,9 +35,29 @@ public interface TseDailyBaseInfoRepository extends JpaRepository<TseDailyBaseIn
         +"sum(t.investment_trust) as 'it', sum(t.dealer_self) as 'ds', "
         +"sum(t.dealer_hedging) as 'dh' from "
         +"(select m.stock_name, tdli.info_date, tdli.foreign_investor, tdli.investment_trust, tdli.dealer_self, tdli.dealer_hedging "
-        +"from stock.tse_daily_legal_info tdli "
-        +"inner join stock.stock_main m on tdli.stock_no = m.stock_no "
-        +"where tdli.info_date > :startDate and tdli.info_date < :endDate) t "
+        +"from stock.tse_daily_base_info tdbi, stock.tse_daily_legal_info tdli, "
+        +"stock.stock_main m where tdli.stock_no = m.stock_no "
+        +"and tdli.stock_no = tdbi.stock_no and tdli.info_date = tdbi.info_date "
+        +"and tdli.info_date > :startDate and tdli.info_date < :endDate) t "
         +"group by t.stock_name order by (sum(t.foreign_investor) + sum(t.investment_trust)) desc ", nativeQuery = true)
-    public List<Map<String, Object>> getWeeklyFiAndItStrategy(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+    public List<Map<String, Object>> getFiAndItBuySellStrategy(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+    
+  
+    //取個股近幾日的總交易量
+    @Query(value = "select t.stock_no, sum(t.total_volumn) as 'sumVolumn' from "
+        +"(select tdbi.stock_no, tdbi.info_date, tdbi.total_volumn from stock.tse_daily_base_info tdbi "
+        +"where tdbi.stock_no in :stockNoList order by tdbi.info_date desc limit :limit) t "
+        +"group by t.stock_no ", nativeQuery = true)
+    public List<Map<String, Object>> getRecentTotalVolumn(@Param("stockNoList") List<String> stockNoList, @Param("limit") Integer limit);
+    
+    //客製策略一
+    @Query(value = "select tdbi.stock_no, sm.stock_name, tdbi.diff_price, "
+        +"tdbi.start_price, tdbi.end_price, tdbi.high_price, tdbi.low_price, tdai.five_avg_price "
+        +"from stock.stock_main sm "
+        +"inner join stock.tse_daily_base_info tdbi on sm.stock_no = tdbi.stock_no "
+        +"inner join stock.tse_daily_avg_info tdai on sm.stock_no = tdai.stock_no "
+        +"where tdbi.info_date = :infoDate and tdai.info_date = :infoDate "
+        +"and tdbi.k_status = 1 and tdbi.low_price >= tdai.five_avg_price ", nativeQuery = true)
+    public List<Map<String, Object>> getCustomStrategy1(@Param("infoDate") LocalDate infoDate);
+    
 }

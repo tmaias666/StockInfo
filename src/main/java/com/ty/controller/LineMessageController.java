@@ -29,7 +29,7 @@ public class LineMessageController{
     @GetMapping("/sendMessage")
     public ResponseEntity<Object> sendMessage(){
         try{
-            stockStrategyService.sendDailyStrategyResult();
+            lineMessageService.sendDailyStrategyResultMessage();
         }catch(Exception e){
             logger.error("error: ", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
@@ -41,7 +41,7 @@ public class LineMessageController{
     public ResponseEntity<Object> getWebhook(@RequestBody String json){
         try{
             logger.info("webhook request body: " + json);
-            lineMessageService.parseUserInfo(json);
+            lineMessageService.parseUserInfoAndReply(json);
         }catch(Exception e){
             logger.error("error: ", e);
         }
