@@ -15,6 +15,9 @@ import org.hibernate.annotations.GenericGenerator;
 
 import com.ty.vo.StockLegalInfo;
 
+import lombok.Data;
+
+@Data
 @SuppressWarnings("serial")
 @Entity
 @Table(name = "otc_daily_legal_info")
@@ -49,76 +52,4 @@ public class OtcDailyLegalInfo extends StockLegalInfo implements Serializable{
 
     @Column(name = "update_time", nullable = false)
     private Date updateTime;
-
-    public Long getId(){
-        return id;
-    }
-
-    public void setId(Long id){
-        this.id = id;
-    }
-
-    public String getStockNo(){
-        return stockNo;
-    }
-
-    public void setStockNo(String stockNo){
-        this.stockNo = stockNo;
-    }
-
-    public LocalDate getInfoDate(){
-        return infoDate;
-    }
-
-    public void setInfoDate(LocalDate infoDate){
-        this.infoDate = infoDate;
-    }
-
-    public Integer getForeignInvestor(){
-        return foreignInvestor;
-    }
-
-    public void setForeignInvestor(Integer foreignInvestor){
-        this.foreignInvestor = foreignInvestor;
-    }
-
-    public Integer getInvestmentTrust(){
-        return investmentTrust;
-    }
-
-    public void setInvestmentTrust(Integer investmentTrust){
-        this.investmentTrust = investmentTrust;
-    }
-
-    public Integer getDealerSelf(){
-        return dealerSelf;
-    }
-
-    public void setDealerSelf(Integer dealerSelf){
-        this.dealerSelf = dealerSelf;
-    }
-
-    public Integer getDealerHedging(){
-        return dealerHedging;
-    }
-
-    public void setDealerHedging(Integer dealerHedging){
-        this.dealerHedging = dealerHedging;
-    }
-
-    public Date getCreateTime(){
-        return createTime;
-    }
-
-    public void setCreateTime(Date createTime){
-        this.createTime = createTime;
-    }
-
-    public Date getUpdateTime(){
-        return updateTime;
-    }
-
-    public void setUpdateTime(Date updateTime){
-        this.updateTime = updateTime;
-    }
 }

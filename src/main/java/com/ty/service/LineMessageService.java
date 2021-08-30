@@ -31,11 +31,24 @@ import com.linecorp.bot.model.response.BotApiResponse;
 import com.ty.Util.DateUtils;
 import com.ty.Util.HttpUtils;
 import com.ty.config.LineConfig;
+import com.ty.context.MessageContext;
+import com.ty.context.StrategyContext;
 import com.ty.entity.LineUserAccount;
+import com.ty.enums.StockType;
+import com.ty.facade.CustomStrategyFacade;
+import com.ty.interfaces.BearStrategy;
+import com.ty.interfaces.BullStrategy;
 import com.ty.repository.LineUserAccountRepository;
 import com.ty.repository.OtcDailyAvgInfoRepository;
 import com.ty.repository.OtcDailyLegalInfoRepository;
 import com.ty.repository.TseDailyAvgInfoRepository;
+import com.ty.strategyImpl.BearStrategy1Impl;
+import com.ty.strategyImpl.BearStrategy2Impl;
+import com.ty.strategyImpl.BullStrategy1Impl;
+import com.ty.strategyImpl.BullStrategy2Impl;
+import com.ty.strategyImpl.LegalPersonRankingImpl;
+import com.ty.strategyImpl.RankingMessageImpl;
+import com.ty.strategyImpl.StrategyMessageImpl;
 import com.ty.vo.HttpResponseVo;
 
 import java.nio.charset.StandardCharsets;
@@ -78,7 +91,7 @@ public class LineMessageService{
     LineUserAccountRepository lineUserAccountRepository;
 
     @Autowired
-    OtcDailyLegalInfoRepository otcDailyLegalInfoRepository;
+    OtcDailyAvgInfoRepository otcDailyAvgInfoRepository;
 
     @Autowired
     HttpUtils httpUtils;
@@ -88,6 +101,30 @@ public class LineMessageService{
 
     @Autowired
     LineConfig lineConfig;
+
+    @Autowired
+    BullStrategy1Impl bullStrategy1Impl;
+
+    @Autowired
+    BullStrategy2Impl bullStrategy2Impl;
+
+    @Autowired
+    BearStrategy1Impl bearStrategy1Impl;
+
+    @Autowired
+    BearStrategy2Impl bearStrategy2Impl;
+
+    @Autowired
+    LegalPersonRankingImpl legalPersonRankingImpl;
+
+    @Autowired
+    StrategyMessageImpl strategyMessageImpl;
+
+    @Autowired
+    RankingMessageImpl rankingMessageImpl;
+
+    @Autowired
+    CustomStrategyFacade customStrategyFacade;
 
     public void parseUserInfoAndReply(String message) throws Exception{
         JSONObject json = new JSONObject(message);
@@ -118,7 +155,9 @@ public class LineMessageService{
                 logger.info("received text: " + text + ";replyToken: " + replyToken);
                 //可審核權限
                 if (!grantAuthority(existUser, text, replyToken)){
-                    processKeywordAndReply(text, replyToken, existUser.getIsVerified());
+                    if (!processCustomStrategy(existUser, text, replyToken)){
+                        processKeywordAndReply(text, replyToken, existUser.getIsVerified());
+                    }
                 }
             }
         }else{
@@ -126,7 +165,7 @@ public class LineMessageService{
         }
     }
 
-    public void processKeywordAndReply(String message, String replyToken, int isVerified){
+    private void processKeywordAndReply(String message, String replyToken, int isVerified){
         try{
             if (isVerified == 0){
                 ReplyMessage replyMessage = new ReplyMessage(replyToken, new TextMessage(requestAuthMessage));
@@ -136,14 +175,17 @@ public class LineMessageService{
             }
             String responseMessage = "";
             //處理撈最近一日資料邏輯
-            LocalDate queryDate = LocalDate.parse(otcDailyLegalInfoRepository.getLatestSyncDate(LocalDate.now()));
+            LocalDate queryDate = LocalDate.parse(otcDailyAvgInfoRepository.getLatestSyncDate(LocalDate.now()));
             List<Message> msgList = new ArrayList<Message>();
             switch(message){
                 case "近一日均線多排外投買":
                     if (caffeineCache.getIfPresent("latestBullStrategy1" + queryDate.toString()) != null){
                         responseMessage = caffeineCache.getIfPresent("latestBullStrategy1" + queryDate.toString()).toString();
                     }else{
-                        responseMessage = stockStrategyService.generateBullStrategyMessage(1, queryDate);
+                        StrategyContext strategyContext = new StrategyContext(bullStrategy1Impl);
+                        MessageContext messageContext = new MessageContext(strategyMessageImpl);
+                        List<Map<String, Object>> resultList = strategyContext.executeBullStrategy(StockType.ALL, queryDate);
+                        responseMessage = messageContext.getResultMessage(resultList, queryDate, bullStrategy1Impl.strategyName);
                         caffeineCache.put("latestBullStrategy1" + queryDate.toString(), responseMessage);
                     }
                     msgList.add(new TextMessage(responseMessage));
@@ -152,7 +194,10 @@ public class LineMessageService{
                     if (caffeineCache.getIfPresent("latestBullStrategy2" + queryDate.toString()) != null){
                         responseMessage = caffeineCache.getIfPresent("latestBullStrategy2" + queryDate.toString()).toString();
                     }else{
-                        responseMessage = stockStrategyService.generateBullStrategyMessage(2, queryDate);
+                        StrategyContext strategyContext = new StrategyContext(bullStrategy2Impl);
+                        MessageContext messageContext = new MessageContext(strategyMessageImpl);
+                        List<Map<String, Object>> resultList = strategyContext.executeBullStrategy(StockType.ALL, queryDate);
+                        responseMessage = messageContext.getResultMessage(resultList, queryDate, bullStrategy2Impl.strategyName);
                         caffeineCache.put("latestBullStrategy2" + queryDate.toString(), responseMessage);
                     }
                     msgList.add(new TextMessage(responseMessage));
@@ -161,7 +206,10 @@ public class LineMessageService{
                     if (caffeineCache.getIfPresent("latestBearStrategy1" + queryDate.toString()) != null){
                         responseMessage = caffeineCache.getIfPresent("latestBearStrategy1" + queryDate.toString()).toString();
                     }else{
-                        responseMessage = stockStrategyService.generateBearStrategyMessage(1, queryDate);
+                        StrategyContext strategyContext = new StrategyContext(bearStrategy1Impl);
+                        MessageContext messageContext = new MessageContext(strategyMessageImpl);
+                        List<Map<String, Object>> resultList = strategyContext.executeBearStrategy(StockType.ALL, queryDate);
+                        responseMessage = messageContext.getResultMessage(resultList, queryDate, bearStrategy1Impl.strategyName);
                         caffeineCache.put("latestBearStrategy1" + queryDate.toString(), responseMessage);
                     }
                     msgList.add(new TextMessage(responseMessage));
@@ -170,7 +218,10 @@ public class LineMessageService{
                     if (caffeineCache.getIfPresent("latestBearStrategy2" + queryDate.toString()) != null){
                         responseMessage = caffeineCache.getIfPresent("latestBearStrategy2" + queryDate.toString()).toString();
                     }else{
-                        responseMessage = stockStrategyService.generateBearStrategyMessage(2, queryDate);
+                        StrategyContext strategyContext = new StrategyContext(bearStrategy2Impl);
+                        MessageContext messageContext = new MessageContext(strategyMessageImpl);
+                        List<Map<String, Object>> resultList = strategyContext.executeBearStrategy(StockType.ALL, queryDate);
+                        responseMessage = messageContext.getResultMessage(resultList, queryDate, bearStrategy2Impl.strategyName);
                         caffeineCache.put("latestBearStrategy2" + queryDate.toString(), responseMessage);
                     }
                     msgList.add(new TextMessage(responseMessage));
@@ -213,23 +264,20 @@ public class LineMessageService{
                 case "近一日外投買賣排行":
                     String dailyRankList1Message;
                     String dailyRankList2Message;
-                    //外投買
-                    if (caffeineCache.getIfPresent("dailyRankList1" + queryDate.toString()) != null){
+                    //外投買+外投賣
+                    if (caffeineCache.getIfPresent("dailyRankList1" + queryDate.toString()) != null && caffeineCache.getIfPresent("dailyRankList2" + queryDate.toString()) != null){
                         dailyRankList1Message = caffeineCache.getIfPresent("dailyRankList1" + queryDate.toString()).toString();
-                    }else{
-                        List<Map<String, Object>> rank1List = stockStrategyService.generateBuySellRankingReport(queryDate.minusDays(1), queryDate.plusDays(1), 1);
-                        dailyRankList1Message = generateRankingMessage(queryDate, rank1List, "最近一日外投買排行");
-                        caffeineCache.put("dailyRankList1" + queryDate.toString(), dailyRankList1Message);
-                    }
-                    msgList.add(new TextMessage(dailyRankList1Message));
-                    //外投賣
-                    if (caffeineCache.getIfPresent("dailyRankList2" + queryDate.toString()) != null){
                         dailyRankList2Message = caffeineCache.getIfPresent("dailyRankList2" + queryDate.toString()).toString();
                     }else{
-                        List<Map<String, Object>> rank2List = stockStrategyService.generateBuySellRankingReport(queryDate.minusDays(1), queryDate.plusDays(1), 2);
-                        dailyRankList2Message = generateRankingMessage(queryDate, rank2List, "最近一日外投賣排行");
+                        StrategyContext strategyContext = new StrategyContext(legalPersonRankingImpl);
+                        MessageContext messageContext = new MessageContext(rankingMessageImpl);
+                        List<List<Map<String, Object>>> resultList = strategyContext.executeRankingStartegy(queryDate.minusDays(1), queryDate.plusDays(1));
+                        dailyRankList1Message = messageContext.getResultMessage(resultList.get(0), queryDate, "近一日外投買超排行");
+                        dailyRankList2Message = messageContext.getResultMessage(resultList.get(1), queryDate, "近一日外投賣超排行");
+                        caffeineCache.put("dailyRankList1" + queryDate.toString(), dailyRankList1Message);
                         caffeineCache.put("dailyRankList2" + queryDate.toString(), dailyRankList2Message);
                     }
+                    msgList.add(new TextMessage(dailyRankList1Message));
                     msgList.add(new TextMessage(dailyRankList2Message));
                     break;
                 case "最近一日自營商避險買":
@@ -253,6 +301,47 @@ public class LineMessageService{
         }catch(Exception e){
             logger.error("process error: ", e);
         }
+    }
+
+    private boolean processCustomStrategy(LineUserAccount userAccount, String text, String replyToken) throws InterruptedException, ExecutionException{
+        if ("custom".equals(text) && userAccount.getId() == 3){
+            String customStrategyMessage = "";
+            LocalDate queryDate = LocalDate.parse(otcDailyAvgInfoRepository.getLatestSyncDate(LocalDate.now()));
+            if (caffeineCache.getIfPresent("JasonStartegyMessage" + queryDate.toString()) != null){
+                customStrategyMessage = caffeineCache.getIfPresent("JasonStartegyMessage" + queryDate.toString()).toString();
+            }else{
+                customStrategyMessage = customStrategyFacade.getJasonStartegyMessage(queryDate);
+            }
+            ReplyMessage replyMessage = new ReplyMessage(replyToken, new TextMessage(customStrategyMessage));
+            BotApiResponse botApiResponse = lineConfig.lineMessagingClient().replyMessage(replyMessage).get();
+            logger.info(gson.toJson(botApiResponse));
+            return true;
+        }else{
+            return false;
+        }
+    }
+
+    private boolean grantAuthority(LineUserAccount userAccount, String text, String replyToken) throws InterruptedException, ExecutionException{
+        if (userAccount.getId() == 1 && text.equals("grantAuth")){
+            List<LineUserAccount> userList = lineUserAccountRepository.findByIsVerified(0);
+            for(LineUserAccount user : userList){
+                user.setIsVerified(1);
+            }
+            lineUserAccountRepository.saveAll(userList);
+            ReplyMessage replyMessage = new ReplyMessage(replyToken, new TextMessage(grantedAuthMessage));
+            BotApiResponse botApiResponse = lineConfig.lineMessagingClient().replyMessage(replyMessage).get();
+            logger.info(gson.toJson(botApiResponse));
+            return true;
+        }
+        return false;
+    }
+
+    private String filterEmoji(String str){
+        if (str.trim().isEmpty()){
+            return str;
+        }
+        str = str.replaceAll("[^(a-zA-Z0-9\\u4e00-\\u9fa5)]", "");
+        return str;
     }
 
     //@Scheduled(cron = "0 22 18 * * MON-FRI")
@@ -307,29 +396,6 @@ public class LineMessageService{
             resultMessage.append("]\r\n\r\n");
         }
         return resultMessage.toString();
-    }
-
-    private boolean grantAuthority(LineUserAccount userAccount, String text, String replyToken) throws InterruptedException, ExecutionException{
-        if (userAccount.getId() == 1 && text.equals("grantAuth")){
-            List<LineUserAccount> userList = lineUserAccountRepository.findByIsVerified(0);
-            for(LineUserAccount user : userList){
-                user.setIsVerified(1);
-            }
-            lineUserAccountRepository.saveAll(userList);
-            ReplyMessage replyMessage = new ReplyMessage(replyToken, new TextMessage(grantedAuthMessage));
-            BotApiResponse botApiResponse = lineConfig.lineMessagingClient().replyMessage(replyMessage).get();
-            logger.info(gson.toJson(botApiResponse));
-            return true;
-        }
-        return false;
-    }
-
-    private String filterEmoji(String str){
-        if (str.trim().isEmpty()){
-            return str;
-        }
-        str = str.replaceAll("[^(a-zA-Z0-9\\u4e00-\\u9fa5)]", "");
-        return str;
     }
 
     public void pushMessageService(List<Message> messageList) throws Exception{

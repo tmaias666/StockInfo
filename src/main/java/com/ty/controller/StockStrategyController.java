@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.ty.facade.CustomStrategyFacade;
 import com.ty.service.StockStrategyService;
 
 @PropertySource(value = "classpath:stock.properties", encoding = "UTF-8")
@@ -42,6 +43,9 @@ public class StockStrategyController{
 
     @Autowired
     private StockStrategyService stockStrategyService;
+
+    @Autowired
+    private CustomStrategyFacade customStrategyFacade;
 
     //@Scheduled(cron = "0 0 18 ? * SAT")
     @GetMapping("/getStockStrategyWeekly")
@@ -81,7 +85,7 @@ public class StockStrategyController{
     @GetMapping("/getCustomStockStrategy1")
     public ResponseEntity<Object> getCustomStockStrategy1(@RequestParam("queryDate") String queryDate) throws KeyManagementException, ClientProtocolException, NoSuchAlgorithmException, IOException{
         try{
-            String resultMessage = stockStrategyService.getCustomStrategy1Message(LocalDate.parse(queryDate));
+            String resultMessage = customStrategyFacade.getJasonStartegyMessage(LocalDate.parse(queryDate));
             return ResponseEntity.status(HttpStatus.OK).body(resultMessage);
         }catch(Exception e){
             logger.error("error: ", e);

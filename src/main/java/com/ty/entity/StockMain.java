@@ -10,6 +10,9 @@ import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
 
+import lombok.Data;
+
+@Data
 @SuppressWarnings("serial")
 @Entity
 @Table(name = "stock_main")
@@ -36,60 +39,4 @@ public class StockMain implements Serializable{
 
     @Column(name = "update_time", nullable = false)
     private Date updateTime;
-
-    public Long getId(){
-        return id;
-    }
-
-    public void setId(Long id){
-        this.id = id;
-    }
-
-    public String getStockNo(){
-        return stockNo;
-    }
-
-    public void setStockNo(String stockNo){
-        this.stockNo = stockNo;
-    }
-
-    public String getStockName(){
-        return stockName;
-    }
-
-    public void setStockName(String stockName){
-        this.stockName = stockName;
-    }
-
-    public Integer getStockType(){
-        return stockType;
-    }
-
-    public void setStockType(Integer stockType){
-        this.stockType = stockType;
-    }
-
-    public Integer getStockFuture(){
-        return stockFuture;
-    }
-
-    public void setStockFuture(Integer stockFuture){
-        this.stockFuture = stockFuture;
-    }
-
-    public Date getCreateTime(){
-        return createTime;
-    }
-
-    public void setCreateTime(Date createTime){
-        this.createTime = createTime;
-    }
-
-    public Date getUpdateTime(){
-        return updateTime;
-    }
-
-    public void setUpdateTime(Date updateTime){
-        this.updateTime = updateTime;
-    }
 }

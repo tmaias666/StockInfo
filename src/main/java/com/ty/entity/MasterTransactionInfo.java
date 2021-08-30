@@ -13,18 +13,15 @@ import javax.persistence.Table;
 
 import org.hibernate.annotations.GenericGenerator;
 
-import com.ty.vo.StockLegalInfo;
-
 import lombok.Data;
 
 @Data
 @SuppressWarnings("serial")
 @Entity
-@Table(name = "tse_daily_legal_info")
-public class TseDailyLegalInfo extends StockLegalInfo implements Serializable{
+@Table(name = "master_transaction_info")
+public class MasterTransactionInfo implements Serializable{
 
     @Id
-    //@GeneratedValue(strategy = GenerationType.IDENTITY)
     @GeneratedValue(generator = "generator")
     @GenericGenerator(name = "generator", strategy = "increment")
     private Long id;
@@ -32,24 +29,24 @@ public class TseDailyLegalInfo extends StockLegalInfo implements Serializable{
     @Column(name = "stock_no", nullable = false)
     private String stockNo;
 
+    @Column(name = "stock_name", nullable = false)
+    private String stockName;
+
     @Column(name = "info_date", nullable = false)
     private LocalDate infoDate;
 
-    @Column(name = "foreign_investor", nullable = false)
-    private Integer foreignInvestor;
+    @Column(name = "transaction_type", nullable = false)
+    private Integer transactionType;
 
-    @Column(name = "investment_trust", nullable = false)
-    private Integer investmentTrust;
+    @Column(name = "buy_volumn", nullable = false)
+    private Integer buyVolumn;
 
-    @Column(name = "dealer_self", nullable = false)
-    private Integer dealerSelf;
+    @Column(name = "sell_volumn", nullable = false)
+    private Integer sellVolumn;
 
-    @Column(name = "dealer_hedging", nullable = false)
-    private Integer dealerHedging;
+    @Column(name = "total_volumn", nullable = false)
+    private Integer totalVolumn;
 
     @Column(name = "create_time", nullable = false)
     private Date createTime;
-
-    @Column(name = "update_time", nullable = false)
-    private Date updateTime;
 }

@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
@@ -22,9 +24,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.ty.Util.DateUtils;
-import com.ty.config.StockConfig;
 import com.ty.service.StockService;
+import com.ty.task.FetchStockLegalInfo;
+import com.ty.task.FetchStockPriceInfo;
+import com.ty.task.SyncStockPriceAvgInfo;
 
 @PropertySource(value = "classpath:stock.properties", encoding = "UTF-8")
 @RestController
@@ -57,8 +60,8 @@ public class StockInfoController{
     @GetMapping("/syncStockPriceAvgInfo")
     public ResponseEntity<Object> syncStockPriceAvgInfo() throws KeyManagementException, ClientProtocolException, NoSuchAlgorithmException, IOException{
         try{
-            FutureTask<String> tseTask = new FutureTask<>(new syncStockPriceAvgInfo(1));
-            FutureTask<String> Otctask = new FutureTask<>(new syncStockPriceAvgInfo(2));
+            FutureTask<String> tseTask = new FutureTask<>(new SyncStockPriceAvgInfo(1, tseDataSeries, stockService));
+            FutureTask<String> Otctask = new FutureTask<>(new SyncStockPriceAvgInfo(2, otcDataSeries, stockService));
             new Thread(tseTask).start();
             new Thread(Otctask).start();
             if ("OK".equals(tseTask.get()) && "OK".equals(Otctask.get())){
@@ -68,31 +71,19 @@ public class StockInfoController{
             }
         }catch(Exception e){
             logger.error("error: ", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("sync info failed!");
         }
     }
 
-    private class syncStockPriceAvgInfo<T> implements Callable<T>{
-
-        private int stockType;
-
-        public syncStockPriceAvgInfo(int stockType){
-            this.stockType = stockType;
-        }
-
-        @Override
-        public T call() throws Exception{
-            switch(stockType){
-                case 1:
-                    stockService.syncStockPriceAvgInfo(tseDataSeries, stockType);
-                    break;
-                case 2:
-                    stockService.syncStockPriceAvgInfo(otcDataSeries, stockType);
-                    break;
-                default:
-                    throw new Exception("invalid stock type!");
-            }
-            return (T) "OK";
+    @GetMapping("/fetchMasterTransactionInfo")
+    public ResponseEntity<Object> fetchMasterTransactionInfo() throws KeyManagementException, ClientProtocolException, NoSuchAlgorithmException, IOException{
+        try{
+            stockService.syncMasterTransacInfo(1);
+            stockService.syncMasterTransacInfo(2);
+            return ResponseEntity.status(HttpStatus.OK).body("sync successfully!");
+        }catch(Exception e){
+            logger.error("error: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("sync info failed!");
         }
     }
 
@@ -100,62 +91,92 @@ public class StockInfoController{
     public ResponseEntity<Object> fetchStockLegalInfo(HttpServletRequest request, @RequestParam("stockType") int stockType) throws KeyManagementException, ClientProtocolException, NoSuchAlgorithmException, IOException{
         try{
             String accessToken = request.getSession().getAttribute("accessToken").toString();
-            String todayDate = LocalDate.now().toString();
-            String[] dateRange = new String[]{
-                todayDate, todayDate
-            };
             switch(stockType){
                 case 1:
-                    for(String stockInfo : tseDataSeries){
-                        String[] info = stockInfo.split(";");
-                        stockService.fetchDailyStockLegalInfo(info[0], stockType, dateRange, accessToken);
+                    List<String> tseDataList = Arrays.asList(tseDataSeries);
+                    FutureTask<String> tseTask1 = new FutureTask<>(new FetchStockLegalInfo(1, tseDataList.subList(0, 100), accessToken, stockService));
+                    FutureTask<String> tseTask2 = new FutureTask<>(new FetchStockLegalInfo(1, tseDataList.subList(100, 200), accessToken, stockService));
+                    FutureTask<String> tseTask3 = new FutureTask<>(new FetchStockLegalInfo(1, tseDataList.subList(200, 300), accessToken, stockService));
+                    FutureTask<String> tseTask4 = new FutureTask<>(new FetchStockLegalInfo(1, tseDataList.subList(300, 400), accessToken, stockService));
+                    FutureTask<String> tseTask5 = new FutureTask<>(new FetchStockLegalInfo(1, tseDataList.subList(400, 500), accessToken, stockService));
+                    FutureTask<String> tseTask6 = new FutureTask<>(new FetchStockLegalInfo(1, tseDataList.subList(500, tseDataList.size()), accessToken, stockService));
+                    new Thread(tseTask1).start();
+                    new Thread(tseTask2).start();
+                    new Thread(tseTask3).start();
+                    new Thread(tseTask4).start();
+                    new Thread(tseTask5).start();
+                    new Thread(tseTask6).start();
+                    if ("OK".equals(tseTask1.get()) && "OK".equals(tseTask2.get()) && "OK".equals(tseTask3.get()) && "OK".equals(tseTask4.get()) && "OK".equals(tseTask5.get()) && "OK".equals(tseTask6.get())){
+                        return ResponseEntity.status(HttpStatus.OK).body("sync successfully!");
+                    }else{
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("failed!");
                     }
-                    break;
                 case 2:
-                    for(String stockInfo : otcDataSeries){
-                        String[] info = stockInfo.split(";");
-                        stockService.fetchDailyStockLegalInfo(info[0], stockType, dateRange, accessToken);
+                    List<String> otcDataList = Arrays.asList(otcDataSeries);
+                    FutureTask<String> otcTask1 = new FutureTask<>(new FetchStockLegalInfo(2, otcDataList.subList(0, 100), accessToken, stockService));
+                    FutureTask<String> otcTask2 = new FutureTask<>(new FetchStockLegalInfo(2, otcDataList.subList(100, 200), accessToken, stockService));
+                    FutureTask<String> otcTask3 = new FutureTask<>(new FetchStockLegalInfo(2, otcDataList.subList(200, otcDataList.size()), accessToken, stockService));
+                    new Thread(otcTask1).start();
+                    new Thread(otcTask2).start();
+                    new Thread(otcTask3).start();
+                    if ("OK".equals(otcTask1.get()) && "OK".equals(otcTask2.get()) && "OK".equals(otcTask3.get())){
+                        return ResponseEntity.status(HttpStatus.OK).body("sync successfully!");
+                    }else{
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("failed!");
                     }
-                    break;
                 default:
                     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("invalid stockType!");
             }
         }catch(Exception e){
             logger.error("error: ", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("fetch info failed!");
         }
-        return ResponseEntity.status(HttpStatus.OK).body("fetch successfully!");
     }
 
     @GetMapping("/fetchStockPriceInfo")
     public ResponseEntity<Object> fetchStockPriceInfo(HttpServletRequest request, @RequestParam("stockType") int stockType) throws KeyManagementException, ClientProtocolException, NoSuchAlgorithmException, IOException{
         try{
             String accessToken = request.getSession().getAttribute("accessToken").toString();
-            String todayDate = LocalDate.now().toString();
-            String[] dateRange = new String[]{
-                todayDate, todayDate
-            };
             switch(stockType){
                 case 1:
-                    for(String stockInfo : tseDataSeries){
-                        String[] info = stockInfo.split(";");
-                        stockService.processAllTypeStockByFinmind(info[0], info[1], 1, dateRange, accessToken);
+                    List<String> tseDataList = Arrays.asList(tseDataSeries);
+                    FutureTask<String> tseTask1 = new FutureTask<>(new FetchStockPriceInfo(1, tseDataList.subList(0, 100), accessToken, stockService));
+                    FutureTask<String> tseTask2 = new FutureTask<>(new FetchStockPriceInfo(1, tseDataList.subList(100, 200), accessToken, stockService));
+                    FutureTask<String> tseTask3 = new FutureTask<>(new FetchStockPriceInfo(1, tseDataList.subList(200, 300), accessToken, stockService));
+                    FutureTask<String> tseTask4 = new FutureTask<>(new FetchStockPriceInfo(1, tseDataList.subList(300, 400), accessToken, stockService));
+                    FutureTask<String> tseTask5 = new FutureTask<>(new FetchStockPriceInfo(1, tseDataList.subList(400, 500), accessToken, stockService));
+                    FutureTask<String> tseTask6 = new FutureTask<>(new FetchStockPriceInfo(1, tseDataList.subList(500, tseDataList.size()), accessToken, stockService));
+                    new Thread(tseTask1).start();
+                    new Thread(tseTask2).start();
+                    new Thread(tseTask3).start();
+                    new Thread(tseTask4).start();
+                    new Thread(tseTask5).start();
+                    new Thread(tseTask6).start();
+                    if ("OK".equals(tseTask1.get()) && "OK".equals(tseTask2.get()) && "OK".equals(tseTask3.get()) && "OK".equals(tseTask4.get()) && "OK".equals(tseTask5.get()) && "OK".equals(tseTask6.get())){
+                        return ResponseEntity.status(HttpStatus.OK).body("sync successfully!");
+                    }else{
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("failed!");
                     }
-                    break;
                 case 2:
-                    for(String stockInfo : otcDataSeries){
-                        String[] info = stockInfo.split(";");
-                        stockService.processAllTypeStockByFinmind(info[0], info[1], 2, dateRange, accessToken);
+                    List<String> otcDataList = Arrays.asList(otcDataSeries);
+                    FutureTask<String> otcTask1 = new FutureTask<>(new FetchStockPriceInfo(2, otcDataList.subList(0, 100), accessToken, stockService));
+                    FutureTask<String> otcTask2 = new FutureTask<>(new FetchStockPriceInfo(2, otcDataList.subList(100, 200), accessToken, stockService));
+                    FutureTask<String> otcTask3 = new FutureTask<>(new FetchStockPriceInfo(2, otcDataList.subList(200, otcDataList.size()), accessToken, stockService));
+                    new Thread(otcTask1).start();
+                    new Thread(otcTask2).start();
+                    new Thread(otcTask3).start();
+                    if ("OK".equals(otcTask1.get()) && "OK".equals(otcTask2.get()) && "OK".equals(otcTask3.get())){
+                        return ResponseEntity.status(HttpStatus.OK).body("sync successfully!");
+                    }else{
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("failed!");
                     }
-                    break;
                 default:
                     return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("invalid stockType!");
             }
         }catch(Exception e){
-            logger.error("request error: " + e.getMessage());
+            logger.error("request error: ", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("fetch info failed!");
         }
-        return ResponseEntity.status(HttpStatus.OK).body("fetch successfully!");
     }
 
     @GetMapping("/rebuildStockPriceAvgInfo")
@@ -182,16 +203,5 @@ public class StockInfoController{
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
         }
         return ResponseEntity.status(HttpStatus.OK).body("fetch successfully!");
-    }
-
-    @GetMapping("/executeDataMigration")
-    public ResponseEntity<Object> executeDataMigration(){
-        try{
-            stockService.executeMigration();
-            return ResponseEntity.status(HttpStatus.OK).body("fetch successfully!");
-        }catch(Exception e){
-            logger.error("error: ", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
-        }
     }
 }

@@ -14,6 +14,9 @@ import javax.persistence.Table;
 
 import org.hibernate.annotations.GenericGenerator;
 
+import lombok.Data;
+
+@Data
 @SuppressWarnings("serial")
 @Entity
 @Table(name = "otc_daily_base_info")
@@ -63,116 +66,4 @@ public class OtcDailyBaseInfo implements Serializable{
 
     @Column(name = "update_time", nullable = false)
     private Date updateTime;
-
-    public Long getId(){
-        return id;
-    }
-
-    public void setId(Long id){
-        this.id = id;
-    }
-
-    public String getStockNo(){
-        return stockNo;
-    }
-
-    public void setStockNo(String stockNo){
-        this.stockNo = stockNo;
-    }
-
-    public Double getStartPrice(){
-        return startPrice;
-    }
-
-    public void setStartPrice(Double startPrice){
-        this.startPrice = startPrice;
-    }
-
-    public Double getHighPrice(){
-        return highPrice;
-    }
-
-    public void setHighPrice(Double highPrice){
-        this.highPrice = highPrice;
-    }
-
-    public Double getLowPrice(){
-        return lowPrice;
-    }
-
-    public void setLowPrice(Double lowPrice){
-        this.lowPrice = lowPrice;
-    }
-
-    public Double getEndPrice(){
-        return endPrice;
-    }
-
-    public void setEndPrice(Double endPrice){
-        this.endPrice = endPrice;
-    }
-
-    public Integer getkStatus(){
-        return kStatus;
-    }
-
-    public void setkStatus(Integer kStatus){
-        this.kStatus = kStatus;
-    }
-
-    public Double getDiffPrice(){
-        return diffPrice;
-    }
-
-    public void setDiffPrice(Double diffPrice){
-        this.diffPrice = diffPrice;
-    }
-
-    public Double getyPrice(){
-        return yPrice;
-    }
-
-    public void setyPrice(Double yPrice){
-        this.yPrice = yPrice;
-    }
-
-    public Integer getTotalVolumn(){
-        return totalVolumn;
-    }
-
-    public void setTotalVolumn(Integer totalVolumn){
-        this.totalVolumn = totalVolumn;
-    }
-
-    public BigDecimal getTransactionAmount(){
-        return transactionAmount;
-    }
-
-    public void setTransactionAmount(BigDecimal transactionAmount){
-        this.transactionAmount = transactionAmount;
-    }
-
-    public LocalDate getInfoDate(){
-        return infoDate;
-    }
-
-    public void setInfoDate(LocalDate infoDate){
-        this.infoDate = infoDate;
-    }
-
-    public Date getCreateTime(){
-        return createTime;
-    }
-
-    public void setCreateTime(Date createTime){
-        this.createTime = createTime;
-    }
-
-    public Date getUpdateTime(){
-        return updateTime;
-    }
-
-    public void setUpdateTime(Date updateTime){
-        this.updateTime = updateTime;
-    }
 }

@@ -15,6 +15,9 @@ import org.springframework.data.repository.query.Param;
 @Repository
 public interface OtcDailyAvgInfoRepository extends JpaRepository<OtcDailyAvgInfo, Long>{
 
+    @Query(value = "select info_date from stock.otc_daily_avg_info odai where info_date <= :now order by info_date desc limit 1 ", nativeQuery = true)
+    public String getLatestSyncDate(@Param("now") LocalDate now);
+    
     //[多方策略1]上櫃均線多排且收盤站上5日均 + 法人買超
     @Query(value = "select '上櫃' as '上市櫃', m.stock_name as '股名', odli.stock_no as '股號',  "
         +"odli.foreign_investor as '外資買賣超', odli.investment_trust as '投信買賣超', "

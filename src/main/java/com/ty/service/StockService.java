@@ -3,6 +3,10 @@ package com.ty.service;
 import org.apache.commons.beanutils.BeanUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.ty.Util.HttpUtils;
 import com.google.gson.Gson;
 import com.ty.Util.DateUtils;
+import com.ty.entity.MasterTransactionInfo;
 import com.ty.entity.OtcDailyAvgInfo;
 import com.ty.entity.OtcDailyBaseInfo;
 import com.ty.entity.OtcDailyLegalInfo;
@@ -21,6 +26,7 @@ import com.ty.entity.TseDailyAvgInfo;
 import com.ty.entity.TseDailyBaseInfo;
 import com.ty.entity.TseDailyLegalInfo;
 import com.ty.mapper.StockAvgInfoMapper;
+import com.ty.repository.MasterTransactionInfoRepository;
 import com.ty.repository.OtcDailyAvgInfoRepository;
 import com.ty.repository.OtcDailyBaseInfoRepository;
 import com.ty.repository.OtcDailyLegalInfoRepository;
@@ -71,57 +77,68 @@ public class StockService{
 
     @Autowired
     private OtcDailyLegalInfoRepository otcDailyLegalInfoRepository;
-    //second
-    //@Autowired
-    //OtcDailyBaseInfoSecondRepository otcDailyBaseInfoSecondRepository;
-    //
-    //@Autowired
-    //OtcDailyLegalInfoSecondRepository otcDailyLegalInfoSecondRepository;
-    //
-    //@Autowired
-    //TseDailyBaseInfoSecondRepository tseDailyBaseInfoSecondRepository;
-    //
-    //@Autowired
-    //TseDailyLegalInfoSecondRepository tseDailyLegalInfoSecondRepository;
+
+    @Autowired
+    private MasterTransactionInfoRepository masterTransactionInfoRepository;
 
     @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
-    public void executeMigration() throws Exception{
-        //        List<TseDailyBaseInfo> tdbiList = tseDailyBaseInfoRepository.findAll();
-        //        List<TseDailyBaseInfoSecond> tdbisList = new ArrayList<TseDailyBaseInfoSecond>();
-        //        for(TseDailyBaseInfo tdbi : tdbiList){
-        //            TseDailyBaseInfoSecond tdbis = new TseDailyBaseInfoSecond();
-        //            BeanUtils.copyProperties(tdbis, tdbi);
-        //            tdbis.setId(null);
-        //            tdbisList.add(tdbis);
-        //        }
-        //        tseDailyBaseInfoSecondRepository.saveAll(tdbisList);
-        //        List<TseDailyLegalInfo> tdliList = tseDailyLegalInfoRepository.findAll();
-        //        List<TseDailyLegalInfoSecond> tdlisList = new ArrayList<TseDailyLegalInfoSecond>();
-        //        for(TseDailyLegalInfo tdli : tdliList){
-        //            TseDailyLegalInfoSecond tdlis = new TseDailyLegalInfoSecond();
-        //            BeanUtils.copyProperties(tdlis, tdli);
-        //            tdlis.setId(null);
-        //            tdlisList.add(tdlis);
-        //        }
-        //        tseDailyLegalInfoSecondRepository.saveAll(tdlisList);
-        //        List<OtcDailyLegalInfo> odliList = otcDailyLegalInfoRepository.findAll();
-        //        List<OtcDailyLegalInfoSecond> odlisList = new ArrayList<OtcDailyLegalInfoSecond>();
-        //        for(OtcDailyLegalInfo odli : odliList){
-        //            OtcDailyLegalInfoSecond odlis = new OtcDailyLegalInfoSecond();
-        //            BeanUtils.copyProperties(odlis, odli);
-        //            odlis.setId(null);
-        //            odlisList.add(odlis);
-        //        }
-        //        otcDailyLegalInfoSecondRepository.saveAll(odlisList);
-        //        List<OtcDailyBaseInfo> odbiList = otcDailyBaseInfoRepository.findAll();
-        //        List<OtcDailyBaseInfoSecond> odbisList = new ArrayList<OtcDailyBaseInfoSecond>();
-        //        for(OtcDailyBaseInfo odbi : odbiList){
-        //            OtcDailyBaseInfoSecond odbis = new OtcDailyBaseInfoSecond();
-        //            BeanUtils.copyProperties(odbis, odbi);
-        //            odbis.setId(null);
-        //            odbisList.add(odbis);
-        //        }
-        //        otcDailyBaseInfoSecondRepository.saveAll(odbisList);
+    public void syncMasterTransacInfo(int type) throws Exception{
+        Document docTse = null;
+        Document docOtc = null;
+        if (type == 1){
+            docTse = Jsoup.connect("http://fubon-ebrokerdj.fbs.com.tw/Z/ZG/ZG_F.djhtm").get();
+            docOtc = Jsoup.connect("http://fubon-ebrokerdj.fbs.com.tw/z/zg/zg_F_1_1.djhtm").get();
+        }else if (type == 2){
+            docTse = Jsoup.connect("http://fubon-ebrokerdj.fbs.com.tw/Z/ZG/ZG_FA.djhtm").get();
+            docOtc = Jsoup.connect("http://fubon-ebrokerdj.fbs.com.tw/z/zg/zg_FA_1_1.djhtm").get();
+        }
+        List<MasterTransactionInfo> tseInfoList = parseMasterTransactionDocument(docTse, type);
+        List<MasterTransactionInfo> otcInfoList = parseMasterTransactionDocument(docOtc, type);
+        masterTransactionInfoRepository.saveAll(tseInfoList);
+        masterTransactionInfoRepository.saveAll(otcInfoList);
+    }
+
+    private List<MasterTransactionInfo> parseMasterTransactionDocument(Document doc, int type){
+        Element table = doc.getElementById("oMainTable");
+        Elements trs = table.getElementsByTag("tr");
+        trs.remove(0);
+        trs.remove(0);
+        List<String> infoList = new ArrayList<>();
+        for(Element tr : trs){
+            StringBuilder sb = new StringBuilder();
+            Elements tds = tr.getElementsByTag("td");
+            for(int i = 0; i < tds.size(); i++){
+                if (i == 1){//parse 標的
+                    sb.append(tds.get(i).getElementsByTag("a").text());
+                }
+                if (i == 5 || i == 6 || i == 7){
+                    sb.append(";" + tds.get(i).text());
+                }
+            }
+            infoList.add(sb.toString());
+        }
+        logger.info(infoList.toString());
+        LocalDate todayDate = LocalDate.now();
+        Date now = new Date();
+        List<MasterTransactionInfo> mtiList = new ArrayList<MasterTransactionInfo>();
+        for(String info : infoList){
+            String[] detail = info.split(";");
+            String[] stockData = detail[0].split(" ");
+            if (stockData.length != 2){
+                continue;
+            }
+            MasterTransactionInfo mti = new MasterTransactionInfo();
+            mti.setStockNo(stockData[0]);
+            mti.setStockName(stockData[1]);
+            mti.setInfoDate(todayDate);
+            mti.setCreateTime(now);
+            mti.setBuyVolumn(Integer.valueOf(detail[1].replaceAll(",", "")));
+            mti.setSellVolumn(Integer.valueOf(detail[2].replaceAll(",", "")));
+            mti.setTotalVolumn(Integer.valueOf(detail[3].replaceAll(",", "")));
+            mti.setTransactionType(type);
+            mtiList.add(mti);
+        }
+        return mtiList;
     }
 
     @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
@@ -629,8 +646,8 @@ public class StockService{
                 //處理漲跌點錯誤資訊
                 String diffPrice = dailyInfo.get("spread").toString();
                 tdbi.setDiffPrice(Double.valueOf(diffPrice));
-                tdbi.setyPrice(endPrice - tdbi.getDiffPrice());
-                tdbi.setkStatus(getKStatus(tdbi.getStartPrice(), tdbi.getEndPrice(), tdbi.getHighPrice(), tdbi.getLowPrice()));//算K棒
+                tdbi.setYPrice(endPrice - tdbi.getDiffPrice());
+                tdbi.setKStatus(getKStatus(tdbi.getStartPrice(), tdbi.getEndPrice(), tdbi.getHighPrice(), tdbi.getLowPrice()));//算K棒
                 tdbi.setCreateTime(now);
                 tdbi.setUpdateTime(now);
                 tdbiList.add(tdbi);
@@ -653,8 +670,8 @@ public class StockService{
                 //處理漲跌點錯誤資訊
                 String diffPrice = dailyInfo.get("spread").toString();
                 odbi.setDiffPrice(Double.valueOf(diffPrice));
-                odbi.setyPrice(endPrice - odbi.getDiffPrice());
-                odbi.setkStatus(getKStatus(odbi.getStartPrice(), odbi.getEndPrice(), odbi.getHighPrice(), odbi.getLowPrice()));//算K棒
+                odbi.setYPrice(endPrice - odbi.getDiffPrice());
+                odbi.setKStatus(getKStatus(odbi.getStartPrice(), odbi.getEndPrice(), odbi.getHighPrice(), odbi.getLowPrice()));//算K棒
                 odbi.setCreateTime(now);
                 odbi.setUpdateTime(now);
                 odbiList.add(odbi);
@@ -702,17 +719,17 @@ public class StockService{
                 if (diffPrice.contains("X")){
                     if (dbiList.size() > 0){
                         TseDailyBaseInfo lastTdbi = dbiList.get(dbiList.size() - 1);
-                        tdbi.setyPrice(lastTdbi.getEndPrice());
+                        tdbi.setYPrice(lastTdbi.getEndPrice());
                         tdbi.setDiffPrice(endPrice - lastTdbi.getEndPrice());
                     }else{
-                        tdbi.setyPrice((double) 0);
+                        tdbi.setYPrice((double) 0);
                         tdbi.setDiffPrice((double) 0);
                     }
                 }else{
                     tdbi.setDiffPrice(Double.valueOf(diffPrice));
-                    tdbi.setyPrice(endPrice - tdbi.getDiffPrice());
+                    tdbi.setYPrice(endPrice - tdbi.getDiffPrice());
                 }
-                tdbi.setkStatus(getKStatus(tdbi.getStartPrice(), tdbi.getEndPrice(), tdbi.getHighPrice(), tdbi.getLowPrice()));//算K棒
+                tdbi.setKStatus(getKStatus(tdbi.getStartPrice(), tdbi.getEndPrice(), tdbi.getHighPrice(), tdbi.getLowPrice()));//算K棒
                 tdbi.setCreateTime(now);
                 tdbi.setUpdateTime(now);
                 dbiList.add(tdbi);
@@ -758,8 +775,8 @@ public class StockService{
                 double endPrice = Double.valueOf(dailyInfoArr.get(6).toString().replaceAll(",", ""));
                 odbi.setEndPrice(endPrice);
                 odbi.setDiffPrice(Double.valueOf(dailyInfoArr.get(7).toString()));
-                odbi.setyPrice(endPrice + odbi.getDiffPrice());
-                odbi.setkStatus(getKStatus(odbi.getStartPrice(), odbi.getEndPrice(), odbi.getHighPrice(), odbi.getLowPrice()));//算K棒
+                odbi.setYPrice(endPrice + odbi.getDiffPrice());
+                odbi.setKStatus(getKStatus(odbi.getStartPrice(), odbi.getEndPrice(), odbi.getHighPrice(), odbi.getLowPrice()));//算K棒
                 odbi.setCreateTime(now);
                 odbi.setUpdateTime(now);
                 dbiList.add(odbi);
