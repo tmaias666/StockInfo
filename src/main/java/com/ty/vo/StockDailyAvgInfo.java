@@ -43,6 +43,8 @@ public class StockDailyAvgInfo implements Serializable{
 
     private Double bollingerBottom;
 
+    private Integer bollingerHeirarchy;
+
     private Date createTime;
 
     private Date updateTime;
@@ -173,6 +175,14 @@ public class StockDailyAvgInfo implements Serializable{
 
     public void setBollingerBottom(Double bollingerBottom){
         this.bollingerBottom = bollingerBottom;
+    }
+
+    public Integer getBollingerHeirarchy(){
+        return bollingerHeirarchy;
+    }
+
+    public void setBollingerHeirarchy(Integer bollingerHeirarchy){
+        this.bollingerHeirarchy = bollingerHeirarchy;
     }
 
     public Date getCreateTime(){

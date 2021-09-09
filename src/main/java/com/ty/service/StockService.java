@@ -191,11 +191,12 @@ public class StockService{
                     case 10://比10日上揚或下彎
                         sdai.setTenAvgDirection(getAvgDirection(todayEndPrice, tempQueue.peekLast()));
                         break;
-                    case 19://算20日均+布林上下軌
+                    case 19://算20日均+布林上下軌+布林位階
                         sdai.setMonthAvgPrice(countAvgPriceInfo(tempQueue));
                         double sd = getStandardDeviaction(tempQueue) * 2;
                         sdai.setBollingerTop(new BigDecimal(sdai.getMonthAvgPrice() + sd).setScale(2, RoundingMode.HALF_UP).doubleValue());
                         sdai.setBollingerBottom(new BigDecimal(sdai.getMonthAvgPrice() - sd).setScale(2, RoundingMode.HALF_UP).doubleValue());
+                        sdai.setBollingerHeirarchy(getBollingerHeirarchy(todayEndPrice, sdai.getBollingerTop(), sdai.getBollingerBottom()));
                         break;
                     case 20://比20日上揚或下彎
                         sdai.setMonthAvgDirection(getAvgDirection(todayEndPrice, tempQueue.peekLast()));
@@ -239,6 +240,18 @@ public class StockService{
                 }
             }
         }
+    }
+
+    private int getBollingerHeirarchy(double todayEndPrice, double bollingerTop, double bollingerBottom){
+        double division = ( bollingerTop - bollingerBottom ) / 6;
+        if (bollingerTop == 0 || bollingerBottom == 0 || todayEndPrice <= bollingerBottom){
+            return 0;
+        }
+        if (todayEndPrice >= bollingerTop){
+            return 7;
+        }
+        double h = ( todayEndPrice - bollingerBottom ) / division;
+        return (int) ( Math.ceil(h * 1.0) / 1.0 );
     }
 
     private int getAvgDirection(double todayEndPrice, double comparedPrice) throws Exception{
@@ -313,7 +326,7 @@ public class StockService{
         for(int i = 0; i < dailyEndPriceList.size(); i++){
             Map<String, Object> tempMap = dailyEndPriceList.get(i);
             tempQueue.add(Double.valueOf(tempMap.get("endPrice").toString()));
-            //算20日+布林上下軌
+            //算20日+布林上下軌+布林位階
             if (tempQueue.size() == 20){
                 List<Double> existList = result.get(tempMap.get("infoDate").toString());
                 double twentyAvgPrice = countAvgPriceInfo(tempQueue);
@@ -328,8 +341,11 @@ public class StockService{
                     throw new Exception("tempPriceForDirection error!");
                 }
                 double sd = getStandardDeviaction(tempQueue) * 2;
-                existList.add(new BigDecimal(twentyAvgPrice + sd).setScale(2, RoundingMode.HALF_UP).doubleValue());
-                existList.add(new BigDecimal(twentyAvgPrice - sd).setScale(2, RoundingMode.HALF_UP).doubleValue());
+                double bollingTop = new BigDecimal(twentyAvgPrice + sd).setScale(2, RoundingMode.HALF_UP).doubleValue();
+                double bollingBottom = new BigDecimal(twentyAvgPrice - sd).setScale(2, RoundingMode.HALF_UP).doubleValue();
+                existList.add(bollingTop);
+                existList.add(bollingBottom);
+                existList.add(new Double(getBollingerHeirarchy(tempQueue.peekLast(), bollingTop, bollingBottom)));
                 result.put(tempMap.get("infoDate").toString(), existList);
                 tempPriceForDirection = tempQueue.pollFirst();
             }
@@ -402,8 +418,8 @@ public class StockService{
         }
         logger.info("同步個股: " + stockNo + ",天數:  " + result.size());
         logger.info(result.toString());
-        //[199.4, 1.0, 196.8, 1.0, 197.7, 2.0, 210.95, 184.45, 202.84, 2.0, 191.0, 1.0, 166.63, 1.0]
-        //[5ma,5ma方向,10ma,10ma方向,20ma,20ma方向,布林上軌,布林下軌,60ma,60ma方向,120ma,120ma方向,240ma,24ma方向]
+        //[199.4, 1.0, 196.8, 1.0, 197.7, 2.0, 210.95, 184.45, 7, 202.84, 2.0, 191.0, 1.0, 166.63, 1.0]
+        //[5ma,5ma方向,10ma,10ma方向,20ma,20ma方向,布林上軌,布林下軌,布林位階,60ma,60ma方向,120ma,120ma方向,240ma,24ma方向]
         //寫DB
         Date now = new Date();
         if (stockType == 1){
@@ -424,12 +440,13 @@ public class StockService{
                 tdai.setMonthAvgDirection(avgPriceList.size() > 5 ? avgPriceList.get(5).intValue() : 0);
                 tdai.setBollingerTop(avgPriceList.size() > 6 ? avgPriceList.get(6) : (double) 0);
                 tdai.setBollingerBottom(avgPriceList.size() > 7 ? avgPriceList.get(7) : (double) 0);
-                tdai.setSeasonAvgPrice(avgPriceList.size() > 8 ? avgPriceList.get(8) : (double) 0);
-                tdai.setSeasonAvgDirection(avgPriceList.size() > 9 ? avgPriceList.get(9).intValue() : 0);
-                tdai.setHalfYearAvgPrice(avgPriceList.size() > 10 ? avgPriceList.get(10) : (double) 0);
-                tdai.setHalfYearAvgDirection(avgPriceList.size() > 11 ? avgPriceList.get(11).intValue() : 0);
-                tdai.setYearAvgPrice(avgPriceList.size() > 12 ? avgPriceList.get(12) : (double) 0);
-                tdai.setYearAvgDirection(avgPriceList.size() > 13 ? avgPriceList.get(13).intValue() : 0);
+                tdai.setBollingerHeirarchy(avgPriceList.size() > 8 ? avgPriceList.get(8).intValue() : 0);
+                tdai.setSeasonAvgPrice(avgPriceList.size() > 9 ? avgPriceList.get(9) : (double) 0);
+                tdai.setSeasonAvgDirection(avgPriceList.size() > 10 ? avgPriceList.get(10).intValue() : 0);
+                tdai.setHalfYearAvgPrice(avgPriceList.size() > 11 ? avgPriceList.get(11) : (double) 0);
+                tdai.setHalfYearAvgDirection(avgPriceList.size() > 12 ? avgPriceList.get(12).intValue() : 0);
+                tdai.setYearAvgPrice(avgPriceList.size() > 13 ? avgPriceList.get(13) : (double) 0);
+                tdai.setYearAvgDirection(avgPriceList.size() > 14 ? avgPriceList.get(14).intValue() : 0);
                 tdaiList.add(tdai);
             }
             Collections.sort(tdaiList, new TseDailyAvgInfoSort());
@@ -452,12 +469,13 @@ public class StockService{
                 odai.setMonthAvgDirection(avgPriceList.size() > 5 ? avgPriceList.get(5).intValue() : 0);
                 odai.setBollingerTop(avgPriceList.size() > 6 ? avgPriceList.get(6) : (double) 0);
                 odai.setBollingerBottom(avgPriceList.size() > 7 ? avgPriceList.get(7) : (double) 0);
-                odai.setSeasonAvgPrice(avgPriceList.size() > 8 ? avgPriceList.get(8) : (double) 0);
-                odai.setSeasonAvgDirection(avgPriceList.size() > 9 ? avgPriceList.get(9).intValue() : 0);
-                odai.setHalfYearAvgPrice(avgPriceList.size() > 10 ? avgPriceList.get(10) : (double) 0);
-                odai.setHalfYearAvgDirection(avgPriceList.size() > 11 ? avgPriceList.get(11).intValue() : 0);
-                odai.setYearAvgPrice(avgPriceList.size() > 12 ? avgPriceList.get(12) : (double) 0);
-                odai.setYearAvgDirection(avgPriceList.size() > 13 ? avgPriceList.get(13).intValue() : 0);
+                odai.setBollingerHeirarchy(avgPriceList.size() > 8 ? avgPriceList.get(8).intValue() : 0);
+                odai.setSeasonAvgPrice(avgPriceList.size() > 9 ? avgPriceList.get(9) : (double) 0);
+                odai.setSeasonAvgDirection(avgPriceList.size() > 10 ? avgPriceList.get(10).intValue() : 0);
+                odai.setHalfYearAvgPrice(avgPriceList.size() > 11 ? avgPriceList.get(11) : (double) 0);
+                odai.setHalfYearAvgDirection(avgPriceList.size() > 12 ? avgPriceList.get(12).intValue() : 0);
+                odai.setYearAvgPrice(avgPriceList.size() > 13 ? avgPriceList.get(13) : (double) 0);
+                odai.setYearAvgDirection(avgPriceList.size() > 14 ? avgPriceList.get(14).intValue() : 0);
                 odaiList.add(odai);
             }
             Collections.sort(odaiList, new OtcDailyAvgInfoSort());

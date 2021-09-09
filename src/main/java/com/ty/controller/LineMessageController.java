@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.ty.akka.service.AkkaService;
 import com.ty.service.LineMessageService;
 import com.ty.service.StockStrategyService;
 
@@ -25,6 +26,9 @@ public class LineMessageController{
 
     @Autowired
     LineMessageService lineMessageService;
+    
+    @Autowired
+    AkkaService akkaService;
 
     @GetMapping("/sendMessage")
     public ResponseEntity<Object> sendMessage(){
@@ -41,7 +45,8 @@ public class LineMessageController{
     public ResponseEntity<Object> getWebhook(@RequestBody String json){
         try{
             logger.info("webhook request body: " + json);
-            lineMessageService.parseUserInfoAndReply(json);
+            //lineMessageService.parseUserInfoAndReply(json);
+            akkaService.handleReplyMessage(json);
         }catch(Exception e){
             logger.error("error: ", e);
         }

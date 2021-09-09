@@ -60,7 +60,7 @@ public interface OtcDailyAvgInfoRepository extends JpaRepository<OtcDailyAvgInfo
     
     
     //[空方策略1]5,10,20ma下彎且外投賣
-    @Query(value = "select '上櫃' as '上市櫃', m.stock_name as '股名', "
+    @Query(value = "select '上櫃' as '上市櫃', m.stock_name as '股名', odli.stock_no as '股號', "
         +"odli.foreign_investor as '外資買賣超', "
         +"odli.investment_trust as '投信買賣超', "
         +"odli.dealer_self as '自營商買賣超', "

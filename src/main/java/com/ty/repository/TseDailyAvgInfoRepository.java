@@ -58,7 +58,7 @@ public interface TseDailyAvgInfoRepository extends JpaRepository<TseDailyAvgInfo
     
     
     //[空方策略1]5,10,20ma下彎且外投賣
-    @Query(value = "select '上市' as '上市櫃', m.stock_name as '股名', "
+    @Query(value = "select '上市' as '上市櫃', m.stock_name as '股名', tdli.stock_no as '股號', "
         +"tdli.foreign_investor as '外資買賣超', "
         +"tdli.investment_trust as '投信買賣超', "
         +"tdli.dealer_self as '自營商買賣超', "

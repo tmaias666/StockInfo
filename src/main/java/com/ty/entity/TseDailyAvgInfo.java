@@ -73,6 +73,9 @@ public class TseDailyAvgInfo implements Serializable{
 
     @Column(name = "bollinger_bottom")
     private Double bollingerBottom;
+    
+    @Column(name = "bollinger_heirarchy")
+    private Integer bollingerHeirarchy;
 
     @Column(name = "create_time", nullable = false)
     private Date createTime;
