@@ -9,11 +9,15 @@ import javax.annotation.PostConstruct;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
 
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
 
+@DependsOn(value = {
+    "lineMessageService"
+})
 @Service
 public class AkkaService{
 

@@ -1,8 +1,17 @@
 package com.ty.service;
 
 import org.apache.commons.beanutils.BeanUtils;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpStatus;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.util.EntityUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -16,7 +25,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.ty.Util.HttpUtils;
 import com.google.gson.Gson;
+import com.mongodb.MongoClient;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import com.mysql.cj.x.protobuf.MysqlxCrud.Collection;
 import com.ty.Util.DateUtils;
+import com.ty.entity.BranchMain;
+import com.ty.entity.MarginShortTradingInfo;
 import com.ty.entity.MasterTransactionInfo;
 import com.ty.entity.OtcDailyAvgInfo;
 import com.ty.entity.OtcDailyBaseInfo;
@@ -26,6 +41,8 @@ import com.ty.entity.TseDailyAvgInfo;
 import com.ty.entity.TseDailyBaseInfo;
 import com.ty.entity.TseDailyLegalInfo;
 import com.ty.mapper.StockAvgInfoMapper;
+import com.ty.repository.BranchMainRepository;
+import com.ty.repository.MarginShortTradingInfoRepository;
 import com.ty.repository.MasterTransactionInfoRepository;
 import com.ty.repository.OtcDailyAvgInfoRepository;
 import com.ty.repository.OtcDailyBaseInfoRepository;
@@ -33,14 +50,17 @@ import com.ty.repository.OtcDailyLegalInfoRepository;
 import com.ty.repository.TseDailyAvgInfoRepository;
 import com.ty.repository.TseDailyBaseInfoRepository;
 import com.ty.repository.TseDailyLegalInfoRepository;
+import com.ty.vo.BuySellInfo;
 import com.ty.vo.StockDailyAvgInfo;
 import com.ty.repository.StockMainRepository;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
@@ -49,6 +69,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class StockService{
@@ -56,6 +77,8 @@ public class StockService{
     private static final Logger logger = LoggerFactory.getLogger(StockService.class);
 
     private static final Gson gson = new Gson();
+
+    private final CloseableHttpClient client = HttpClientBuilder.create().build();
 
     @Autowired
     private StockMainRepository stockMainRepository;
@@ -81,21 +104,352 @@ public class StockService{
     @Autowired
     private MasterTransactionInfoRepository masterTransactionInfoRepository;
 
+    @Autowired
+    private BranchMainRepository branchMainRepository;
+
+    @Autowired
+    private MarginShortTradingInfoRepository marginShortTradingInfoRepository;
+
+    @Autowired
+    MongoClient mongoDBClient;
+
     @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
-    public void syncMasterTransacInfo(int type) throws Exception{
-        Document docTse = null;
-        Document docOtc = null;
-        if (type == 1){
-            docTse = Jsoup.connect("http://fubon-ebrokerdj.fbs.com.tw/Z/ZG/ZG_F.djhtm").get();
-            docOtc = Jsoup.connect("http://fubon-ebrokerdj.fbs.com.tw/z/zg/zg_F_1_1.djhtm").get();
-        }else if (type == 2){
-            docTse = Jsoup.connect("http://fubon-ebrokerdj.fbs.com.tw/Z/ZG/ZG_FA.djhtm").get();
-            docOtc = Jsoup.connect("http://fubon-ebrokerdj.fbs.com.tw/z/zg/zg_FA_1_1.djhtm").get();
+    public boolean syncMarginTradingInfo(String stockNo) throws Exception{
+        //        try{
+        //            HttpClientBuilder builder = HttpClientBuilder.create();
+        //            CloseableHttpClient client = builder.build();
+        //            //HttpUriRequest httpGet = new HttpGet("http://histock.tw/stock/branch.aspx?no=" + stockNo);
+        //            //httpGet.setHeader("cookie", "ASP.NET_SessionId=s5d0jepp304ckfo5q4cvq4gg");
+        //            HttpUriRequest httpGet = new HttpGet("https://histock.tw/stock/" + stockNo);
+        //            CloseableHttpResponse response = client.execute(httpGet);
+        //            if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK){
+        //                HttpEntity entity = response.getEntity();
+        //                if (entity != null){
+        //                    String entityStr = EntityUtils.toString(entity, "UTF-8");
+        //                    System.out.println(entityStr);
+        //                    Document doc = Jsoup.parse(entityStr);
+        //                    return parseMarginTradingDocument(stockNo, doc);
+        //                }
+        //            }
+        //        }catch(IOException e){
+        //            e.printStackTrace();
+        //        }
+        //        return false;
+        //        Map<String, String> headers = new HashMap<>();
+        //        headers.put("Accept", "*/*");
+        //        headers.put("Accept-Encoding", "gzip, deflate, br");
+        //        headers.put("Connection", "keep-alive");
+        //        headers.put("cookie", "ASP.NET_SessionId=s5d0jepp304ckfo5q4cvq4gg");
+        Connection connection = Jsoup.connect("https://histock.tw/stock/" + stockNo);
+        //.headers(headers).cookie("ASP.NET_SessionId", "s5d0jepp304ckfo5q4cvq4gg");
+        Document doc = connection.get();
+        return parseMarginTradingDocument(stockNo, doc);
+    }
+
+    private boolean parseMarginTradingDocument(String stockNo, Document doc){
+        Element div = doc.getElementById("LBlock_8");
+        Element divDate = div.getElementsByClass("cfdate").first();
+        String infoDate = divDate.text().split(":")[1].replaceAll("\\.", "-");
+        LocalDate today = LocalDate.now();
+        if (!today.toString().equals(infoDate)){
+            logger.info("infoDate: " + infoDate);
+            return false;
         }
-        List<MasterTransactionInfo> tseInfoList = parseMasterTransactionDocument(docTse, type);
-        List<MasterTransactionInfo> otcInfoList = parseMasterTransactionDocument(docOtc, type);
-        masterTransactionInfoRepository.saveAll(tseInfoList);
-        masterTransactionInfoRepository.saveAll(otcInfoList);
+        Element table = div.getElementsByClass("tb-stock").first();
+        Elements trs = table.getElementsByTag("tr");
+        StringBuilder sb = new StringBuilder();
+        for(int k = 0; k < trs.size(); k++){
+            if (( k % 2 ) == 1){
+                Elements tds = trs.get(k).getElementsByTag("td");
+                for(int i = 0; i < tds.size(); i++){
+                    if (k == 1 || k == 7){
+                        if (i == 0 || i == 1 || i == 2){//融資增減,融券增減,借券增減,當沖資訊
+                            sb.append(tds.get(i).text() + ";");
+                            continue;
+                        }
+                    }
+                    if (k == 3){
+                        if (i == 0 || i == 1 || i == 4){//融資餘額,融券餘額,借券餘額
+                            sb.append(tds.get(i).text() + ";");
+                            continue;
+                        }
+                    }
+                    if (k == 5){
+                        if (i == 2 || i == 3){//借券賣出餘額,券資比
+                            sb.append(tds.get(i).text() + ";");
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+        logger.info(stockNo + ": " + sb.toString());
+        if (sb.toString().isEmpty()){
+            return false;
+        }
+        String[] record = sb.toString().split(";");
+        Date now = new Date();
+        MarginShortTradingInfo msti = new MarginShortTradingInfo();
+        msti.setInfoDate(today);
+        msti.setStockNo(stockNo);
+        msti.setMarginTradingDiff("-".equals(record[0]) ? 0 : Integer.valueOf(record[0].replaceAll(",", "")));
+        msti.setShortSellingDiff("-".equals(record[1]) ? 0 : Integer.valueOf(record[1].replaceAll(",", "")));
+        msti.setSecurityLendingDiff("-".equals(record[2]) ? 0 : Integer.valueOf(record[2].replaceAll(",", "")));
+        msti.setMarginTradingTotal("-".equals(record[3]) ? 0 : Integer.valueOf(record[3].replaceAll(",", "")));
+        msti.setShortSellingTotal("-".equals(record[4]) ? 0 : Integer.valueOf(record[4].replaceAll(",", "")));
+        msti.setSecurityLendingTotal("-".equals(record[5]) ? 0 : Integer.valueOf(record[5].replaceAll(",", "")));
+        msti.setSecurityLendingOutTotal("-".equals(record[6]) ? 0 : Integer.valueOf(record[6].replaceAll(",", "")));
+        msti.setShortMarginRatio("-".equals(record[7]) ? 0 : Double.valueOf(record[7].replaceAll("%", "")));
+        msti.setDayTradingVolumn("-".equals(record[8]) ? 0 : Integer.valueOf(record[8].replaceAll(",", "")));
+        msti.setDayTradingRate("-".equals(record[9]) ? 0 : Double.valueOf(record[9].replaceAll("%", "")));
+        msti.setDayTradingProfit("-".equals(record[10]) ? 0 : Double.valueOf(record[10].replaceAll(",", "")));
+        msti.setCreateTime(now);
+        msti.setUpdateTime(now);
+        marginShortTradingInfoRepository.save(msti);
+        return true;
+    }
+
+    private void insertMarginShortTradingInfoToMongoDB(String stockNo, String[] record){
+        MongoDatabase database = mongoDBClient.getDatabase("stock_info");
+        MongoCollection<org.bson.Document> collection = database.getCollection("margin_short_trading_info");
+        List<org.bson.Document> documents = new ArrayList<>();
+        String infoDate = LocalDate.now().toString();
+        org.bson.Document document = new org.bson.Document();
+        document.append("info_date", infoDate);
+        document.append("stock_no", stockNo);
+        document.append("margin_trading_diff", record[0].replaceAll(",", ""));
+        document.append("short_selling_diff", record[1].replaceAll(",", ""));
+        document.append("security_lending_diff", record[2].replaceAll(",", ""));
+        document.append("margin_trading_total", record[3].replaceAll(",", ""));
+        document.append("short_selling_total", record[4].replaceAll(",", ""));
+        document.append("security_lending_total", record[5].replaceAll(",", ""));
+        document.append("security_lending_out_total", record[6].replaceAll(",", ""));
+        document.append("short_margin_ratio", record[7]);
+        document.append("day_trading_volumn", record[8].replaceAll(",", ""));
+        document.append("day_trading_rate", record[9]);
+        document.append("day_trading_profit", record[10].replaceAll(",", ""));
+        documents.add(document);
+        collection.insertMany(documents);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
+    public void syncBranchTradingInfo() throws Exception{
+        List<BranchMain> bmList = branchMainRepository.findAll();
+        String urlPrefix = "http://fubon-ebrokerdj.fbs.com.tw/z/zg/zgb/zgb0.djhtm?";
+        for(BranchMain bm : bmList){
+            //帶時間&c=B&e=2021-9-22&f=2021-9-22
+            Document doc = Jsoup.connect(urlPrefix + bm.getBranchQuery() + "&c=E&d=1").get();
+            parseBranchTradingDocument(bm, doc);
+        }
+    }
+
+    private void parseBranchTradingDocument(BranchMain bm, Document doc){
+        Element mainTable = doc.getElementById("oMainTable");
+        Element mainTr = mainTable.getElementsByTag("tr").get(2);
+        Elements buyTrs = mainTr.getElementsByTag("table").get(0).getElementsByTag("tr");
+        Elements sellTrs = mainTr.getElementsByTag("table").get(1).getElementsByTag("tr");
+        List<BuySellInfo> buyInfoList = new ArrayList<>();
+        for(int i = 2; i < buyTrs.size(); i++){
+            BuySellInfo info = new BuySellInfo();
+            Elements tds = buyTrs.get(i).getElementsByTag("td");
+            for(int j = 0; j < tds.size(); j++){
+                if (j == 0){
+                    String inner = tds.get(j).getElementsByTag("SCRIPT").html();
+                    //System.out.println(inner.toString());
+                    if (inner.isEmpty()){
+                        break;
+                    }
+                    inner = inner.substring(19, inner.lastIndexOf("'") + 1);
+                    String[] stockInfo = inner.replaceAll("'", "").replaceAll(",", "_").replaceAll("AS", "").split("_");
+                    info.setStockNo(stockInfo[0]);
+                    info.setStockName(stockInfo[1]);
+                }else{
+                    int volumn = Integer.valueOf(tds.get(j).text().replaceAll(",", ""));
+                    switch(j){
+                        case 1:
+                            info.setBuyVolumn(volumn);
+                            break;
+                        case 2:
+                            info.setSellVolumn(volumn);
+                            break;
+                        case 3:
+                            info.setTotalVolumn(volumn);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+            buyInfoList.add(info);
+        }
+        List<BuySellInfo> sellInfoList = new ArrayList<>();
+        for(int i = 2; i < sellTrs.size(); i++){
+            BuySellInfo info = new BuySellInfo();
+            Elements tds = sellTrs.get(i).getElementsByTag("td");
+            for(int j = 0; j < tds.size(); j++){
+                if (j == 0){
+                    String inner = tds.get(j).getElementsByTag("SCRIPT").html();
+                    //System.out.println(inner.toString());
+                    if (inner.isEmpty()){
+                        break;
+                    }
+                    inner = inner.substring(19, inner.lastIndexOf("'") + 1);
+                    String[] stockInfo = inner.replaceAll("'", "").replaceAll(",", "_").replaceAll("AS", "").split("_");
+                    info.setStockNo(stockInfo[0]);
+                    info.setStockName(stockInfo[1]);
+                }else{
+                    int volumn = Integer.valueOf(tds.get(j).text().replaceAll(",", ""));
+                    switch(j){
+                        case 1:
+                            info.setBuyVolumn(volumn);
+                            break;
+                        case 2:
+                            info.setSellVolumn(volumn);
+                            break;
+                        case 3:
+                            info.setTotalVolumn(volumn);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+            sellInfoList.add(info);
+        }
+        logger.info(buyInfoList.size() + "buyInfoList: " + buyInfoList.toString());
+        logger.info(sellInfoList.size() + "sellInfoList: " + sellInfoList.toString());
+        MongoDatabase database = mongoDBClient.getDatabase("stock_info");
+        MongoCollection<org.bson.Document> collection = database.getCollection("branch_trading_info");
+        String infoDate = LocalDate.now().toString();
+        org.bson.Document document = new org.bson.Document();
+        document.append("info_date", infoDate);
+        document.append("branch_id", bm.getId());
+        document.append("branch_name", bm.getBranchName());
+        document.append("buy_result", gson.toJson(buyInfoList));
+        document.append("sell_result", gson.toJson(sellInfoList));
+        collection.insertOne(document);
+    }
+    //    private boolean parseBranchTradingDocument(String stockNo, Document doc){
+    //        Element div = doc.getElementById("Block_8");
+    //        Element table = div.getElementsByClass("tb-stock").first();
+    //        Elements trs = table.getElementsByTag("tr");
+    //        trs.remove(0);
+    //        List<String> infoList = new ArrayList<>();
+    //        for(Element tr : trs){
+    //            StringBuilder sb = new StringBuilder();
+    //            Elements tds = tr.getElementsByTag("td");
+    //            for(int i = 0; i < tds.size(); i++){
+    //                if (i == 0 || i == 5){//parse 分點
+    //                    sb.append(tds.get(i).getElementsByTag("a").text());
+    //                    continue;
+    //                }
+    //                String text;
+    //                if (tds.get(i).text().isEmpty()){
+    //                    text = "0";
+    //                }else{
+    //                    text = tds.get(i).text();
+    //                }
+    //                if (i == 4){
+    //                    sb.append(";" + text + "_");
+    //                }else{
+    //                    sb.append(";" + text);
+    //                }
+    //            }
+    //            infoList.add(sb.toString());
+    //        }
+    //        if (infoList.isEmpty()){
+    //            return false;
+    //            //System.out.println("stockNo: " + stockNo);
+    //        }
+    //        //System.out.println(infoList.toString());
+    //        MongoDatabase database = mongoDBClient.getDatabase("stock_info");
+    //        MongoCollection<org.bson.Document> collection = database.getCollection("branch_trading_info");
+    //        List<org.bson.Document> documents = new ArrayList<>();
+    //        String infoDate = LocalDate.now().toString();
+    //        for(String info : infoList){
+    //            String[] content = info.split("_");
+    //            for(String s : content){
+    //                String[] record = s.split(";");
+    //                org.bson.Document document = new org.bson.Document();
+    //                document.append("info_date", infoDate);
+    //                document.append("stock_no", stockNo);
+    //                document.append("branch_name", record[0]);
+    //                document.append("buy_volumn", record[1].replaceAll(",", ""));
+    //                document.append("sell_volumn", record[2].replaceAll(",", ""));
+    //                document.append("total_volumn", record[3].replaceAll(",", ""));
+    //                document.append("avg_price", record[4]);
+    //                documents.add(document);
+    //            }
+    //        }
+    //        collection.insertMany(documents);
+    //        return true;
+    //    }
+
+    @Transactional(propagation = Propagation.REQUIRED, rollbackFor = Exception.class)
+    public void syncMasterTransacInfo() throws Exception{
+        //主力買超前50
+        Document docTseBuy = Jsoup.connect("http://fubon-ebrokerdj.fbs.com.tw/Z/ZG/ZG_F.djhtm").get();
+        Document docOtcBuy = Jsoup.connect("http://fubon-ebrokerdj.fbs.com.tw/z/zg/zg_F_1_1.djhtm").get();
+        List<MasterTransactionInfo> buyTseInfoList = parseMasterTransactionDocument(docTseBuy, 1);
+        List<MasterTransactionInfo> buyOtcInfoList = parseMasterTransactionDocument(docOtcBuy, 1);
+        masterTransactionInfoRepository.saveAll(buyTseInfoList);
+        masterTransactionInfoRepository.saveAll(buyOtcInfoList);
+        //主力賣超前50
+        Document docTseSell = Jsoup.connect("http://fubon-ebrokerdj.fbs.com.tw/Z/ZG/ZG_FA.djhtm").get();
+        Document docOtcSell = Jsoup.connect("http://fubon-ebrokerdj.fbs.com.tw/z/zg/zg_FA_1_1.djhtm").get();
+        List<MasterTransactionInfo> sellTseInfoList = parseMasterTransactionDocument(docTseSell, 2);
+        List<MasterTransactionInfo> sellOtcInfoList = parseMasterTransactionDocument(docOtcSell, 2);
+        masterTransactionInfoRepository.saveAll(sellTseInfoList);
+        masterTransactionInfoRepository.saveAll(sellOtcInfoList);
+        List<String> tseList = new ArrayList<>();
+        tseList.addAll(buyTseInfoList.stream().map(x -> x.getStockNo()).collect(Collectors.toList()));
+        tseList.addAll(sellTseInfoList.stream().map(x -> x.getStockNo()).collect(Collectors.toList()));
+        List<String> otcList = new ArrayList<>();
+        otcList.addAll(buyOtcInfoList.stream().map(x -> x.getStockNo()).collect(Collectors.toList()));
+        otcList.addAll(sellOtcInfoList.stream().map(x -> x.getStockNo()).collect(Collectors.toList()));
+        //同步剩下個股的主力買賣超
+        List<String> allTseList = stockMainRepository.getStockNoByStockType(1);
+        List<String> allOtcList = stockMainRepository.getStockNoByStockType(2);
+        allTseList.removeAll(tseList);
+        allOtcList.removeAll(otcList);
+        allTseList.addAll(allOtcList);
+        List<MasterTransactionInfo> remainingInfoList = new ArrayList<>();
+        List<String> errorList = new ArrayList<>();
+        for(String stockNo : allTseList){
+            try{
+                Document docTemp = Jsoup.connect("http://fubon-ebrokerdj.fbs.com.tw/z/zc/zco/zco_" + stockNo + ".djhtm").get();
+                remainingInfoList.add(parseMasterTransactionDocument(docTemp));
+            }catch(Exception e){
+                logger.error("error: " + e.getMessage());
+                errorList.add(stockNo);
+            }
+        }
+        logger.info(remainingInfoList.toString());
+        logger.info(errorList.toString());
+        masterTransactionInfoRepository.saveAll(remainingInfoList);
+    }
+
+    private MasterTransactionInfo parseMasterTransactionDocument(Document doc){
+        Element table = doc.getElementById("oMainTable");
+        Elements trs = table.getElementsByTag("tr");
+        String trInfo = trs.get(0).text();
+        String temp = trInfo.substring(0, trInfo.indexOf(")"));
+        String[] stockData = temp.split("\\(");
+        Element trBuySell = trs.get(23);//買賣超張數 //Element tr2 = trs.get(24);
+        Elements tds = trBuySell.getElementsByTag("td");
+        logger.info("淨買超: " + tds.get(1) + "; 淨賣超" + tds.get(3));
+        LocalDate todayDate = LocalDate.now();
+        Date now = new Date();
+        MasterTransactionInfo mti = new MasterTransactionInfo();
+        mti.setStockNo(stockData[1]);
+        mti.setStockName(stockData[0]);
+        mti.setInfoDate(todayDate);
+        mti.setCreateTime(now);
+        mti.setBuyVolumn(Integer.valueOf(tds.get(1).text().replaceAll(",", "")));
+        mti.setSellVolumn(Integer.valueOf(tds.get(3).text().replaceAll(",", "")));
+        mti.setTotalVolumn(mti.getBuyVolumn() - mti.getSellVolumn());
+        mti.setTransactionType(mti.getTotalVolumn() > 0 ? 1 : 2);
+        return mti;
     }
 
     private List<MasterTransactionInfo> parseMasterTransactionDocument(Document doc, int type){

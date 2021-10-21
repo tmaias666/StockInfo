@@ -91,6 +91,9 @@ public class LineMessageService{
     LineUserAccountRepository lineUserAccountRepository;
 
     @Autowired
+    TseDailyAvgInfoRepository tseDailyAvgInfoRepository;
+
+    @Autowired
     OtcDailyAvgInfoRepository otcDailyAvgInfoRepository;
 
     @Autowired
@@ -154,7 +157,7 @@ public class LineMessageService{
                 String replyToken = event.get("replyToken").toString();
                 logger.info("received text: " + text + ";replyToken: " + replyToken);
                 //可審核權限
-                if (!grantAuthority(existUser, text, replyToken)){
+                if (!grantAuthorityOrTriggerEvents(existUser, text, replyToken)){
                     if (!processCustomStrategy(existUser, text, replyToken)){
                         processKeywordAndReply(text, replyToken, existUser.getIsVerified());
                     }
@@ -175,7 +178,7 @@ public class LineMessageService{
             }
             String responseMessage = "";
             //處理撈最近一日資料邏輯
-            LocalDate queryDate = LocalDate.parse(otcDailyAvgInfoRepository.getLatestSyncDate(LocalDate.now()));
+            LocalDate queryDate = LocalDate.parse(tseDailyAvgInfoRepository.getLatestSyncDate(LocalDate.now()));
             List<Message> msgList = new ArrayList<Message>();
             switch(message){
                 case "近一日均線多排外投買":
@@ -321,17 +324,19 @@ public class LineMessageService{
         }
     }
 
-    private boolean grantAuthority(LineUserAccount userAccount, String text, String replyToken) throws InterruptedException, ExecutionException{
-        if (userAccount.getId() == 1 && text.equals("grantAuth")){
-            List<LineUserAccount> userList = lineUserAccountRepository.findByIsVerified(0);
-            for(LineUserAccount user : userList){
-                user.setIsVerified(1);
+    private boolean grantAuthorityOrTriggerEvents(LineUserAccount userAccount, String text, String replyToken) throws InterruptedException, ExecutionException{
+        if (userAccount.getId() == 1){
+            if (text.equals("grantAuth")){
+                List<LineUserAccount> userList = lineUserAccountRepository.findByIsVerified(0);
+                for(LineUserAccount user : userList){
+                    user.setIsVerified(1);
+                }
+                lineUserAccountRepository.saveAll(userList);
+                ReplyMessage replyMessage = new ReplyMessage(replyToken, new TextMessage(grantedAuthMessage));
+                BotApiResponse botApiResponse = lineConfig.lineMessagingClient().replyMessage(replyMessage).get();
+                logger.info(gson.toJson(botApiResponse));
+                return true;
             }
-            lineUserAccountRepository.saveAll(userList);
-            ReplyMessage replyMessage = new ReplyMessage(replyToken, new TextMessage(grantedAuthMessage));
-            BotApiResponse botApiResponse = lineConfig.lineMessagingClient().replyMessage(replyMessage).get();
-            logger.info(gson.toJson(botApiResponse));
-            return true;
         }
         return false;
     }

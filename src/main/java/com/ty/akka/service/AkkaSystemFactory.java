@@ -20,7 +20,7 @@ public class AkkaSystemFactory<T>{
 
     private static final Logger logger = LoggerFactory.getLogger(AkkaSystemFactory.class);
 
-    private static final int defaultPoolSize = 5;
+    private static final int defaultPoolSize = 3;
     //private static final ActorSystem system = ActorSystem.create("AkkaService");
 
     public AkkaSystemFactory(List<ActorRef> masters, Class<T> targetClass, String systemName, String masterName){

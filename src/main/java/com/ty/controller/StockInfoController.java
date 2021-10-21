@@ -4,14 +4,22 @@ import java.io.IOException;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import javax.servlet.http.HttpServletRequest;
 
 import org.apache.http.client.ClientProtocolException;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +27,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.PropertySource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -56,6 +65,7 @@ public class StockInfoController{
 
     @Autowired
     String[] otcDataSeries;
+    //ThreadPoolExecutor threadPool = new ThreadPoolExecutor(10, 10, 0L, TimeUnit.MINUTES, new LinkedBlockingQueue<>());
 
     @GetMapping("/syncStockPriceAvgInfo")
     public ResponseEntity<Object> syncStockPriceAvgInfo() throws KeyManagementException, ClientProtocolException, NoSuchAlgorithmException, IOException{
@@ -75,11 +85,56 @@ public class StockInfoController{
         }
     }
 
+    //@Scheduled(cron = "0 0 22 ? * *")
+    @GetMapping("/fetchMarginTradingInfo")
+    public ResponseEntity<Object> fetchMarginTradingInfo(HttpServletRequest request, @RequestParam("stockType") int stockType) throws KeyManagementException, ClientProtocolException, NoSuchAlgorithmException, IOException{
+        try{
+            List<String> failedList = new ArrayList<>();
+            switch(stockType){
+                case 1:
+                    List<String> tseDataList = Arrays.asList(tseDataSeries);
+                    for(int i = 0; i < tseDataList.size(); i++){
+                        String[] info = tseDataList.get(i).split(";");
+                        boolean result = stockService.syncMarginTradingInfo(info[0]);
+                        if (!result){
+                            failedList.add(info[0]);
+                        }
+                    }
+                    return ResponseEntity.status(HttpStatus.OK).body("tse failed list: " + failedList.toString());
+                case 2:
+                    List<String> otcDataList = Arrays.asList(otcDataSeries);
+                    for(int j = 0; j < otcDataList.size(); j++){
+                        String[] info = otcDataList.get(j).split(";");
+                        boolean result = stockService.syncMarginTradingInfo(info[0]);
+                        if (!result){
+                            failedList.add(info[0]);
+                        }
+                    }
+                    return ResponseEntity.status(HttpStatus.OK).body("otc failed list: " + failedList.toString());
+                default:
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("invalid stockType!");
+            }
+        }catch(Exception e){
+            logger.error("error: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("fetch info failed!");
+        }
+    }
+
+    @GetMapping("/fetchBranchTradingInfo")
+    public ResponseEntity<Object> fetchBranchTradingInfo(HttpServletRequest request) throws KeyManagementException, ClientProtocolException, NoSuchAlgorithmException, IOException{
+        try{
+            stockService.syncBranchTradingInfo();
+            return ResponseEntity.status(HttpStatus.OK).body("sync successfully!");
+        }catch(Exception e){
+            logger.error("error: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("fetch info failed!");
+        }
+    }
+
     @GetMapping("/fetchMasterTransactionInfo")
     public ResponseEntity<Object> fetchMasterTransactionInfo() throws KeyManagementException, ClientProtocolException, NoSuchAlgorithmException, IOException{
         try{
-            stockService.syncMasterTransacInfo(1);
-            stockService.syncMasterTransacInfo(2);
+            stockService.syncMasterTransacInfo();
             return ResponseEntity.status(HttpStatus.OK).body("sync successfully!");
         }catch(Exception e){
             logger.error("error: ", e);
